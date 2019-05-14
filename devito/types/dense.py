@@ -734,7 +734,6 @@ class DiscreteFunction(AbstractCachedFunction, ArgProvider):
         """Tuple of argument names introduced by this function."""
         return (self.name,)
 
-    @memoized_meth
     def _arg_defaults(self, alias=None):
         """
         A map of default argument values defined by this symbol.

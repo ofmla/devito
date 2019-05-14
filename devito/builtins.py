@@ -7,7 +7,8 @@ import numpy as np
 
 import devito as dv
 
-__all__ = ['assign', 'smooth', 'norm', 'sumall', 'inner', 'mmin', 'mmax']
+__all__ = ['assign', 'smooth', 'gaussian_smooth', 'norm', 'sumall', 'inner',
+           'mmin', 'mmax']
 
 
 def assign(f, v=0):
@@ -51,6 +52,131 @@ def smooth(f, g, axis=None):
         if axis is None:
             axis = g.dimensions[-1]
         dv.Operator(dv.Eq(f, g.avg(dims=axis)), name='smoother')()
+
+
+def gaussian_smooth(f, sigma=1, _order=4, mode='reflect'):
+    """
+    Gaussian smooth function.
+    """
+    class DataDomain(dv.SubDomain):
+
+        name = 'datadomain'
+
+        def __init__(self, lw):
+            super(DataDomain, self).__init__()
+            self.lw = lw
+
+        def define(self, dimensions):
+            return {d: ('middle', self.lw, self.lw) for d in dimensions}
+
+    def fill_data(g, f, dim, lw, mode):
+
+        sl = slice(lw, -lw, 1)
+        indices = []
+        for _ in g.grid.dimensions:
+            indices.append(sl)
+        if isinstance(f, np.ndarray):
+            g.data[tuple(indices)] = f[:]
+        elif isinstance(f, dv.Function):
+            g.data[tuple(indices)] = f.data[:]
+        else:
+            raise NotImplementedError
+        indfl = []
+        indgl = []
+        indfr = []
+        indgr = []
+        if mode == 'constant':
+            for d in g.grid.dimensions:
+                if d == dim:
+                    indfl.append(0)
+                    indgl.append(slice(0, lw, 1))
+                    indfr.append(-1)
+                    indgr.append(slice(-lw, -1, 1))
+                else:
+                    indfl.append(slice(0, -1, 1))
+                    indgl.append(slice(lw, -lw, 1))
+                    indfr.append(slice(0, -1, 1))
+                    indgr.append(slice(lw, -lw, 1))
+            if isinstance(f, np.ndarray):
+                g.data[tuple(indgl)] = f[tuple(indfl)]
+                g.data[tuple(indgr)] = f[tuple(indfr)]
+            elif isinstance(f, dv.Function):
+                g.data[tuple(indgl)] = f.data[tuple(indfl)]
+                g.data[tuple(indgr)] = f.data[tuple(indfr)]
+            else:
+                raise NotImplementedError
+        elif mode == 'reflect':
+            for d in g.grid.dimensions:
+                if d == dim:
+                    indfl.append(slice(lw-1, None, -1))
+                    indgl.append(slice(0, lw, 1))
+                    indfr.append(slice(-1, -(lw+1), -1))
+                    indgr.append(slice(-lw, None, 1))
+                else:
+                    indfl.append(slice(0, None, 1))
+                    indgl.append(slice(lw, -lw, 1))
+                    indfr.append(slice(0, None, 1))
+                    indgr.append(slice(lw, -lw, 1))
+            if isinstance(f, np.ndarray):
+                g.data[tuple(indgl)] = f[tuple(indfl)]
+                g.data[tuple(indgr)] = f[tuple(indfr)]
+            elif isinstance(f, dv.Function):
+                g.data[tuple(indgl)] = f.data[tuple(indfl)]
+                g.data[tuple(indgr)] = f.data[tuple(indfr)]
+            else:
+                raise NotImplementedError
+        else:
+            raise ValueError("Mode not available")
+
+        return
+
+    def subfloor(f, g):
+        sl = slice(lw, -lw, 1)
+        indices = []
+        slices = (slice(None, None, 1), )*len(g.grid.dimensions)
+        for _ in range(len(g.grid.dimensions)):
+            indices.append(sl)
+        if isinstance(f, np.ndarray):
+            f[slices] = np.floor(g.data[tuple(indices)])
+        elif isinstance(f, dv.Function):
+            f.data[slices] = np.floor(g.data[tuple(indices)])
+        else:
+            raise NotImplementedError
+
+    lw = int(_order*sigma + 0.5)
+
+    # Create the padded grid:
+    datadomain = DataDomain(lw)
+    # FIMXE: change to type test
+    try:
+        shape_padded = np.array(f.grid.shape) + 2*lw
+    except AttributeError:
+        shape_padded = np.array(f.shape) + 2*lw
+    grid = dv.Grid(shape=shape_padded, subdomains=datadomain)
+    dims = grid.dimensions
+
+    f_c = dv.Function(name='f_c', grid=grid, space_order=2*lw,
+                      coefficients='symbolic', dtype=np.int32)
+    f_o = dv.Function(name='f_o', grid=grid, coefficients='symbolic', dtype=np.int32)
+
+    weights = np.exp(-0.5/sigma**2*(np.linspace(-lw, lw, 2*lw+1))**2)
+    weights = weights/weights.sum()
+
+    for d in dims:
+
+        fill_data(f_c, f, d, lw, mode)
+
+        rhs = dv.generic_derivative(f_c, d, 2*lw, 1)
+        coeffs = dv.Coefficient(1, f_c, d, weights)
+
+        expr = dv.Eq(f_o, rhs, coefficients=dv.Substitutions(coeffs),
+                     subdomain=grid.subdomains['datadomain'])
+        op = dv.Operator(expr)
+        op.apply()
+
+        subfloor(f, f_o)
+
+    return f
 
 
 # Reduction-inducing builtins

@@ -4,7 +4,7 @@ from devito.tools import Tag, as_tuple, is_integer
 
 __all__ = ['Index', 'NONLOCAL', 'PROJECTED', 'index_is_basic', 'index_apply_modulo',
            'index_dist_to_repl', 'convert_index', 'index_handle_oob',
-           'loc_data_idx', 'mpi_index_maps']
+           'loc_data_idx', 'mpi_index_maps', 'flip_idx']
 
 
 class Index(Tag):
@@ -227,29 +227,7 @@ def mpi_index_maps(loc_idx, shape, topology, coords, comm):
         dat_len[coords[j]] = comm.bcast(shape, root=j)
         if any(k == 0 for k in dat_len[coords[j]]):
             dat_len[coords[j]] = as_tuple([0]*len(dat_len[coords[j]]))
-    # Work out the cumulative data shape
-    dat_len_cum = np.zeros(topology, dtype=tuple)
-    for i in range(nprocs):
-        my_coords = coords[i]
-        if i == 0:
-            dat_len_cum[my_coords] = dat_len[my_coords]
-            continue
-        left_neighbours = []
-        for j in range(len(my_coords)):
-            left_coord = list(my_coords)
-            left_coord[j] -= 1
-            left_neighbours.append(as_tuple(left_coord))
-        left_neighbours = as_tuple(left_neighbours)
-        n_dat = []  # Normalised data size
-        for j in range(len(my_coords)):
-            if left_neighbours[j][j] < 0:
-                c_dat = dat_len[my_coords][j]
-                n_dat.append(c_dat)
-            else:
-                c_dat = dat_len[my_coords][j]  # Current length
-                p_dat = dat_len[left_neighbours[j]][j]  # Previous length
-                n_dat.append(c_dat+p_dat)
-        dat_len_cum[my_coords] = as_tuple(n_dat)
+    dat_len_cum = distributed_data_size(dat_len, coords, topology, nprocs)
     # This 'transform' will be required to produce the required maps
     transform = []
     for i in as_tuple(loc_idx):
@@ -331,3 +309,75 @@ def mpi_index_maps(loc_idx, shape, topology, coords, comm):
         local_si[index] = as_tuple(rnorm_index)
         it.iternext()
     return owners, send, global_si, local_si
+
+
+def flip_idx(idx, decomposition):
+    processed = []
+    for i, j in zip(as_tuple(idx), decomposition):
+        if isinstance(i, slice) and i.step is not None and i.step < 0:
+            if i.start is None:
+                stop = None
+            elif i.start > 0:
+                stop = i.start + 1
+            else:
+                stop = i.start + j.glb_max + 2
+            if i.stop is None:
+                start = None
+            elif i.stop > 0:
+                start = i.stop + 1
+            else:
+                start = i.stop + j.glb_max + 2
+            processed.append(slice(start, stop, -i.step))
+        elif isinstance(i, slice):
+            if i.start is not None and i.start < 0:
+                start = i.start + j.glb_max + 1
+            else:
+                start = i.start
+            if i.stop is not None and i.stop < 0:
+                stop = i.stop + j.glb_max + 1
+            else:
+                stop = i.stop
+            processed.append(slice(start, stop, i.step))
+        else:
+            processed.append(i)
+    return as_tuple(processed)
+
+
+def distributed_data_size(shape, coords, topology, nprocs):
+    # Compute the cumulative shape of the distributed data
+    cshape = np.zeros(topology, dtype=tuple)
+    for i in range(nprocs):
+        my_coords = coords[i]
+        if i == 0:
+            cshape[my_coords] = shape[my_coords]
+            continue
+        left_neighbours = []
+        for j in range(len(my_coords)):
+            left_coord = list(my_coords)
+            left_coord[j] -= 1
+            left_neighbours.append(as_tuple(left_coord))
+        left_neighbours = as_tuple(left_neighbours)
+        n_dat = []  # Normalised data size
+        if sum(shape[my_coords]) == 0:
+            prev_dat_len = []
+            for j in left_neighbours:
+                if any(d < 0 for d in j):
+                    pass
+                else:
+                    prev_dat_len.append(cshape[j])
+            func = lambda a, b: max([d[b] for d in a])
+            max_dat_len = []
+            for j in range(len(my_coords)):
+                max_dat_len.append(func(prev_dat_len, j))
+            cshape[my_coords] = as_tuple(max_dat_len)
+        else:
+            for j in range(len(my_coords)):
+                if left_neighbours[j][j] < 0:
+                    c_dat = shape[my_coords][j]
+                    n_dat.append(c_dat)
+                else:
+                    c_dat = shape[my_coords][j]  # Current length
+                    p_dat = cshape[left_neighbours[j]][j]  # Previous length
+                    n_dat.append(c_dat+p_dat)
+            cshape[my_coords] = as_tuple(n_dat)
+    return cshape
