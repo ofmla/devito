@@ -239,4 +239,4 @@ class Derivative(sympy.Derivative, Differentiable):
                                      matvec=self.transpose, x0=self.x0)
         for e in self._eval_at:
             res = res.xreplace(e)
-        return res
+        return res.evaluate
