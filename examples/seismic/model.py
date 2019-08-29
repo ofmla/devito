@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 from examples.seismic.utils import scipy_smooth
-from devito import Grid, SubDomain, Function, Constant, warning, mmin, mmax
+from devito import Grid, SubDomain, Function, Constant, mmin, mmax
 from devito.tools import as_tuple
 
 __all__ = ['Model', 'ModelElastic', 'demo_model']
@@ -14,17 +14,21 @@ def demo_model(preset, **kwargs):
     Utility function to create preset `Model` objects for
     demonstration and testing purposes. The particular presets are ::
 
-    * `constant-isotropic` : Constant velocity (1.5km/sec) isotropic model
+    * `constant-isotropic` : Constant velocity (1.5 km/sec) isotropic model
     * `constant-tti` : Constant anisotropic model. Velocity is 1.5 km/sec and
                       Thomsen parameters are epsilon=.3, delta=.2, theta = .7rad
                       and phi=.35rad for 3D. 2d/3d is defined from the input shape
-    * 'layers-isotropic': Simple two-layer model with velocities 1.5 km/s
-                 and 2.5 km/s in the top and bottom layer respectively.
+    * 'layers-isotropic': Simple n-layered model with velocities ranging from 1.5 km/s
+                 to 3.5 km/s in the top and bottom layer respectively.
                  2d/3d is defined from the input shape
-    * 'layers-tti': Simple two-layer TTI model with velocities 1.5 km/s
-                    and 2.5 km/s in the top and bottom layer respectively.
-                    Thomsen parameters in the top layer are 0 and in the lower layer
-                    are epsilon=.3, delta=.2, theta = .5rad and phi=.1 rad for 3D.
+    * 'layers-elastic': Simple n-layered model with velocities ranging from 1.5 km/s
+                    to 3.5 km/s in the top and bottom layer respectively.
+                    Vs is set to .5 vp and 0 in the top layer.
+    * 'layers-viscoelastic': Simple two layers viscoelastic model.
+    * 'layers-tti': Simple n-layered model with velocities ranging from 1.5 km/s
+                    to 3.5 km/s in the top and bottom layer respectively.
+                    Thomsen parameters in the top layer are 0 and in the lower layers
+                    are scaled versions of vp.
                     2d/3d is defined from the input shape
     * 'circle-isotropic': Simple camembert model with velocities 1.5 km/s
                  and 2.5 km/s in a circle at the center. 2D only.
@@ -512,7 +516,7 @@ class GenericModel(object):
     General model class with common properties
     """
     def __init__(self, origin, spacing, shape, space_order, nbpml=20,
-                 dtype=np.float32, subdomains=()):
+                 dtype=np.float32, subdomains=(), damp_is_mask=False):
         self.shape = shape
         self.nbpml = int(nbpml)
         self.origin = tuple([dtype(o) for o in origin])
@@ -528,12 +532,28 @@ class GenericModel(object):
         self.grid = Grid(extent=extent, shape=shape_pml, origin=origin_pml, dtype=dtype,
                          subdomains=subdomains)
 
+        # Create dampening field as symbol `damp`
+        self.damp = Function(name="damp", grid=self.grid)
+        initialize_damp(self.damp, self.nbpml, self.spacing, mask=damp_is_mask)
+
     def physical_params(self, **kwargs):
         """
         Return all set physical parameters and update to input values if provided
         """
         known = [getattr(self, i) for i in self._physical_parameters]
         return {i.name: kwargs.get(i.name, i) or i for i in known}
+
+    def _gen_phys_param(self, field, name, space_order, is_param=False,
+                        default_val=0):
+        if field is None:
+            return default_val
+        if isinstance(field, np.ndarray):
+            function = Function(name=name, grid=self.grid, space_order=space_order,
+                                parameter=is_param)
+            initialize_function(function, field, self.nbpml)
+        else:
+            function = Constant(name=name, value=field)
+        return function
 
     @property
     def dim(self):
@@ -593,7 +613,7 @@ class Model(GenericModel):
     space_order : int
         Order of the spatial stencil discretisation.
     vp : array_like or float
-        Velocity in km/s
+        Velocity in km/s.
     nbpml : int, optional
         The number of PML layers for boundary damping.
     dtype : np.float32 or np.float64
@@ -622,75 +642,26 @@ class Model(GenericModel):
                                     subdomains)
 
         # Create square slowness of the wave as symbol `m`
-        if isinstance(vp, np.ndarray):
-            self._vp = Function(name="vp", grid=self.grid, space_order=space_order)
-            initialize_function(self._vp, vp, self.nbpml)
-        else:
-            self._vp = Constant(name="vp", value=vp)
+        self._vp = self._gen_phys_param(vp, 'vp', space_order)
         self._physical_parameters = ('vp',)
         self._max_vp = np.max(vp)
 
-        # Create dampening field as symbol `damp`
-        self.damp = Function(name="damp", grid=self.grid)
-        initialize_damp(self.damp, self.nbpml, self.spacing)
-
         # Additional parameter fields for TTI operators
-        self.scale = 1.
+        self.epsilon = self._gen_phys_param(epsilon, 'epsilon', space_order,
+                                            default_val=1)
+        self.scale = 1 if epsilon is None else np.sqrt(1 + 2 * mmax(epsilon))
 
-        if epsilon is not None:
-            if isinstance(epsilon, np.ndarray):
-                self._physical_parameters += ('epsilon',)
-                self.epsilon = Function(name="epsilon", grid=self.grid)
-                initialize_function(self.epsilon, epsilon, self.nbpml)
-                # Maximum velocity is scale*max(vp) if epsilon > 0
-                if mmax(self.epsilon) > 0:
-                    self.scale = np.sqrt(1 + 2 * mmax(self.epsilon))
-            else:
-                self.epsilon = epsilon
-                self.scale = epsilon
-        else:
-            self.epsilon = 1
-
-        if delta is not None:
-            if isinstance(delta, np.ndarray):
-                self._physical_parameters += ('delta',)
-                self.delta = Function(name="delta", grid=self.grid)
-                initialize_function(self.delta, delta, self.nbpml)
-            else:
-                self.delta = delta
-        else:
-            self.delta = 1
-
-        if theta is not None:
-            if isinstance(theta, np.ndarray):
-                self._physical_parameters += ('theta',)
-                self.theta = Function(name="theta", grid=self.grid,
-                                      space_order=space_order)
-                initialize_function(self.theta, theta, self.nbpml)
-            else:
-                self.theta = theta
-        else:
-            self.theta = 0
-
-        if phi is not None:
-            if self.grid.dim < 3:
-                warning("2D TTI does not use an azimuth angle Phi, ignoring input")
-                self.phi = 0
-            elif isinstance(phi, np.ndarray):
-                self._physical_parameters += ('phi',)
-                self.phi = Function(name="phi", grid=self.grid, space_order=space_order)
-                initialize_function(self.phi, phi, self.nbpml)
-            else:
-                self.phi = phi
-        else:
-            self.phi = 0
+        self.delta = self._gen_phys_param(delta, 'delta', space_order,
+                                          default_val=1)
+        self.theta = self._gen_phys_param(theta, 'theta', space_order)
+        self.phi = self._gen_phys_param(phi, 'delta', space_order)
 
     @property
     def critical_dt(self):
         """
         Critical computational time step value from the CFL condition.
         """
-        # For a fixed time order this number goes down as the space order increases.
+        # For a fixed time order this number decreases as the space order increases.
         #
         # The CFL condtion is then given by
         # dt <= coeff * h / (max(velocity))
@@ -769,11 +740,9 @@ class ModelElastic(GenericModel):
     def __init__(self, origin, spacing, shape, space_order, vp, vs, rho, nbpml=20,
                  dtype=np.float32):
         super(ModelElastic, self).__init__(origin, spacing, shape, space_order,
-                                           nbpml=nbpml, dtype=dtype)
+                                           nbpml=nbpml, dtype=dtype,
+                                           mask_is_damp=True)
         self.maxvp = np.max(vp)
-        # Create dampening field as symbol `damp`
-        self.damp = Function(name="damp", grid=self.grid)
-        initialize_damp(self.damp, self.nbpml, self.spacing, mask=True)
 
         physical_parameters = []
 
@@ -789,28 +758,17 @@ class ModelElastic(GenericModel):
 
         self._physical_parameters = as_tuple(physical_parameters)
 
-    def _gen_phys_param(self, field, name, space_order, is_param=False):
-        if isinstance(field, np.ndarray):
-            function = Function(name=name, grid=self.grid, space_order=space_order,
-                                parameter=is_param)
-            initialize_function(function, field, self.nbpml)
-        else:
-            function = Constant(name=name, value=field)
-        return function
-
     @property
     def critical_dt(self):
         """
         Critical computational time step value from the CFL condition.
         """
-        # For a fixed time order this number goes down as the space order increases.
+        # For a fixed time order this number decreases as the space order increases.
         #
         # The CFL condtion is then given by
         # dt < h / (sqrt(2) * max(vp)))
-        # Remeber that for staggered grid, FD is formulated on an h/2 grid
-        #  so needs .5 * h
         coeff = np.sqrt(3) if len(self.shape) == 3 else np.sqrt(3)
-        return self.dtype(.48*mmin(self.spacing) / (coeff*self.maxvp))
+        return self.dtype(.95*mmin(self.spacing) / (coeff*self.maxvp))
 
 
 class ModelViscoelastic(ModelElastic):
