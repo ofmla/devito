@@ -147,7 +147,7 @@ class Compiler(GCCToolchain):
         self.ldflags = ['-shared']
 
         self.include_dirs = []
-        self.libraries = []
+        self.libraries = ['m']
         self.library_dirs = []
         self.defines = []
         self.undefines = []
@@ -452,11 +452,6 @@ class CustomCompiler(Compiler):
     flags are read from OMP_LDFLAGS or otherwise default to ``-fopenmp``.
     """
 
-    CC = environ.get('CC', 'gcc')
-    CXX = environ.get('CXX', 'g++')
-    MPICC = environ.get('MPICC', 'mpicc')
-    MPICXX = environ.get('MPICXX', 'mpicxx')
-
     def __init__(self, *args, **kwargs):
         super(CustomCompiler, self).__init__(*args, **kwargs)
         default = '-O3 -g -march=native -fPIC -Wall -std=c99'
@@ -466,10 +461,10 @@ class CustomCompiler(Compiler):
             self.ldflags += environ.get('OMP_LDFLAGS', '-fopenmp').split(' ')
 
     def __lookup_cmds__(self):
-        self.CC = 'gcc'
-        self.CXX = 'g++'
-        self.MPICC = 'mpicc'
-        self.MPICXX = 'mpicxx'
+        self.CC = environ.get('CC', 'gcc')
+        self.CXX = environ.get('CXX', 'g++')
+        self.MPICC = environ.get('MPICC', 'mpicc')
+        self.MPICXX = environ.get('MPICXX', 'mpicxx')
 
 
 compiler_registry = {

@@ -1,9 +1,11 @@
 import os
 
 import numpy as np
+from sympy import sin, Abs
 
 from examples.seismic.utils import scipy_smooth
-from devito import Grid, SubDomain, Function, Constant, mmin, mmax
+from devito import (Grid, SubDomain, Function, Constant, mmax,
+                    SubDimension, Eq, Inc, Operator)
 from devito.tools import as_tuple
 
 __all__ = ['Model', 'ModelElastic', 'demo_model']
@@ -72,7 +74,7 @@ def demo_model(preset, **kwargs):
         qp = kwargs.pop('qp', 100.)
         vs = kwargs.pop('vs', 1.2)
         qs = kwargs.pop('qs', 70.)
-        rho = 2.0
+        rho = 2.
 
         return ModelViscoelastic(space_order=space_order, vp=vp, qp=qp, vs=vs,
                                  qs=qs, rho=rho, origin=origin, shape=shape,
@@ -173,14 +175,14 @@ def demo_model(preset, **kwargs):
                             '2layer-viscoelastic']:
         # A two-layer model in a 2D or 3D domain with two different
         # velocities split across the height dimension:
-        # By default, the top part of the domain has 1.5 km/s,
-        # and the bottom part of the domain has 2.5 km/s.
+        # By default, the top part of the domain has 1.6 km/s,
+        # and the bottom part of the domain has 2.2 km/s.
         shape = kwargs.pop('shape', (101, 101))
         spacing = kwargs.pop('spacing', tuple([10. for _ in shape]))
         origin = kwargs.pop('origin', tuple([0. for _ in shape]))
         dtype = kwargs.pop('dtype', np.float32)
         nbpml = kwargs.pop('nbpml', 10)
-        ratio = kwargs.pop('ratio', 2)
+        ratio = kwargs.pop('ratio', 3)
         vp_top = kwargs.pop('vp_top', 1.6)
         qp_top = kwargs.pop('qp_top', 40.)
         vs_top = kwargs.pop('vs_top', 0.4)
@@ -190,7 +192,7 @@ def demo_model(preset, **kwargs):
         qp_bottom = kwargs.pop('qp_bottom', 100.)
         vs_bottom = kwargs.pop('vs_bottom', 1.2)
         qs_bottom = kwargs.pop('qs_bottom', 70.)
-        rho_bottom = kwargs.pop('qs_bottom', 2.0)
+        rho_bottom = kwargs.pop('qs_bottom', 2.)
 
         # Define a velocity profile in km/s
         vp = np.empty(shape, dtype=dtype)
@@ -447,37 +449,30 @@ def initialize_damp(damp, nbpml, spacing, mask=False):
         mask => 1 inside the domain and decreases in the layer
         not mask => 0 inside the domain and increase in the layer
     """
+    dampcoeff = 1.5 * np.log(1.0 / 0.001) / (40)
 
-    phy_shape = damp.grid.subdomains['phydomain'].shape
-    data = np.ones(phy_shape) if mask else np.zeros(phy_shape)
+    eqs = [Eq(damp, 1.0)] if mask else []
+    for d in damp.dimensions:
+        # left
+        dim_l = SubDimension.left(name='abc_%s_l' % d.name, parent=d,
+                                  thickness=nbpml)
+        pos = Abs((nbpml - (dim_l - d.symbolic_min) + 1) / float(nbpml))
+        val = dampcoeff * (pos - sin(2*np.pi*pos)/(2*np.pi))
+        val = -val if mask else val
+        eqs += [Inc(damp.subs({d: dim_l}), val/d.spacing)]
+        # right
+        dim_r = SubDimension.right(name='abc_%s_r' % d.name, parent=d,
+                                   thickness=nbpml)
+        pos = Abs((nbpml - (d.symbolic_max - dim_r) + 1) / float(nbpml))
+        val = dampcoeff * (pos - sin(2*np.pi*pos)/(2*np.pi))
+        val = -val if mask else val
+        eqs += [Inc(damp.subs({d: dim_r}), val/d.spacing)]
 
-    pad_widths = [(nbpml, nbpml) for i in range(damp.ndim)]
-    data = np.pad(data, pad_widths, 'edge')
-
-    dampcoeff = 1.5 * np.log(1.0 / 0.001) / (40.)
-
-    assert all(damp._offset_domain[0] == i for i in damp._offset_domain)
-
-    for i in range(damp.ndim):
-        for j in range(nbpml):
-            # Dampening coefficient
-            pos = np.abs((nbpml - j + 1) / float(nbpml))
-            val = dampcoeff * (pos - np.sin(2*np.pi*pos)/(2*np.pi))
-            if mask:
-                val = -val
-            # : slices
-            all_ind = [slice(0, d) for d in data.shape]
-            # Left slice for dampening for dimension i
-            all_ind[i] = slice(j, j+1)
-            data[tuple(all_ind)] += val/spacing[i]
-            # right slice for dampening for dimension i
-            all_ind[i] = slice(data.shape[i]-j, data.shape[i]-j+1)
-            data[tuple(all_ind)] += val/spacing[i]
-
-    initialize_function(damp, data, 0)
+    # TODO: Figure out why yask doesn't like it with dse/dle
+    Operator(eqs, name='initdamp', dse='noop', dle='noop')()
 
 
-def initialize_function(function, data, nbpml, pad_mode='edge'):
+def initialize_function(function, data, nbpml):
     """
     Initialize a `Function` with the given ``data``. ``data``
     does *not* include the PML layers for the absorbing boundary conditions;
@@ -491,12 +486,23 @@ def initialize_function(function, data, nbpml, pad_mode='edge'):
         The data array used for initialisation.
     nbpml : int
         Number of PML layers for boundary damping.
-    pad_mode : str or callable, optional
-        A string or a suitable padding function as explained in :func:`numpy.pad`.
     """
-    pad_widths = [(nbpml + i.left, nbpml + i.right) for i in function._size_halo]
-    data = np.pad(data, pad_widths, pad_mode)
-    function.data_with_halo[:] = data
+    slices = tuple([slice(nbpml, -nbpml) for _ in range(function.grid.dim)])
+    function.data[slices] = data
+    eqs = []
+
+    for d in function.dimensions:
+        dim_l = SubDimension.left(name='abc_%s_l' % d.name, parent=d,
+                                  thickness=nbpml)
+        to_copy = nbpml
+        eqs += [Eq(function.subs({d: dim_l}), function.subs({d: to_copy}))]
+        dim_r = SubDimension.right(name='abc_%s_r' % d.name, parent=d,
+                                   thickness=nbpml)
+        to_copy = d.symbolic_max - nbpml
+        eqs += [Eq(function.subs({d: dim_r}), function.subs({d: to_copy}))]
+
+    # TODO: Figure out why yask doesn't like it with dse/dle
+    Operator(eqs, name='padfunc', dse='noop', dle='noop')()
 
 
 class PhysicalDomain(SubDomain):
@@ -516,7 +522,7 @@ class GenericModel(object):
     General model class with common properties
     """
     def __init__(self, origin, spacing, shape, space_order, nbpml=20,
-                 dtype=np.float32, subdomains=(), damp_is_mask=False):
+                 dtype=np.float32, subdomains=(), damp_mask=False):
         self.shape = shape
         self.nbpml = int(nbpml)
         self.origin = tuple([dtype(o) for o in origin])
@@ -534,7 +540,7 @@ class GenericModel(object):
 
         # Create dampening field as symbol `damp`
         self.damp = Function(name="damp", grid=self.grid)
-        initialize_damp(self.damp, self.nbpml, self.spacing, mask=damp_is_mask)
+        initialize_damp(self.damp, self.nbpml, self.spacing, mask=damp_mask)
 
     def physical_params(self, **kwargs):
         """
@@ -597,6 +603,16 @@ class GenericModel(object):
         """
         return tuple((d-1) * s for d, s in zip(self.shape, self.spacing))
 
+    def _gen_phys_param(self, field, name, space_order, default_value=0):
+        if field is None:
+            return default_value
+        if isinstance(field, np.ndarray):
+            function = Function(name=name, grid=self.grid, space_order=space_order)
+            initialize_function(function, field, self.nbpml)
+        else:
+            function = Constant(name=name, value=field)
+        return function
+
 
 class Model(GenericModel):
     """
@@ -648,13 +664,14 @@ class Model(GenericModel):
 
         # Additional parameter fields for TTI operators
         self.epsilon = self._gen_phys_param(epsilon, 'epsilon', space_order,
-                                            default_val=1)
+                                            default_value=1)
         self.scale = 1 if epsilon is None else np.sqrt(1 + 2 * mmax(epsilon))
 
         self.delta = self._gen_phys_param(delta, 'delta', space_order,
-                                          default_val=1)
+                                          default_value=1)
         self.theta = self._gen_phys_param(theta, 'theta', space_order)
         self.phi = self._gen_phys_param(phi, 'delta', space_order)
+
 
     @property
     def critical_dt(self):
@@ -666,7 +683,7 @@ class Model(GenericModel):
         # The CFL condtion is then given by
         # dt <= coeff * h / (max(velocity))
         coeff = 0.38 if len(self.shape) == 3 else 0.42
-        dt = self.dtype(coeff * mmin(self.spacing) / (self.scale*self._max_vp))
+        dt = self.dtype(coeff * np.min(self.spacing) / (self.scale*self._max_vp))
         return self.dtype("%.3f" % dt)
 
     @property
@@ -741,11 +758,10 @@ class ModelElastic(GenericModel):
                  dtype=np.float32):
         super(ModelElastic, self).__init__(origin, spacing, shape, space_order,
                                            nbpml=nbpml, dtype=dtype,
-                                           mask_is_damp=True)
-        self.maxvp = np.max(vp)
+                                           damp_mask=True)
 
         physical_parameters = []
-
+        self.maxvp = np.max(vp)
         self.lam = self._gen_phys_param((vp**2 - 2 * vs**2)*rho, 'lam', space_order,
                                         is_param=True)
         physical_parameters.append('lam')

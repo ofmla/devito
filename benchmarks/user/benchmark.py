@@ -138,9 +138,8 @@ def option_performance(f):
         click.option('--dle', callback=from_value,
                      type=click.Choice(['noop'] + configuration._accepted['dle']),
                      help='Devito loop engine (DLE) mode'),
-        click.option('-bs', '--block-shape', nargs=3, type=(int, int, int),
-                     callback=config_blockshape, multiple=True, is_eager=True,
-                     help='Loop-blocking shape, bypass autotuning'),
+        click.option('-bs', '--block-shape', callback=config_blockshape, multiple=True,
+                     is_eager=True, help='Loop-blocking shape, bypass autotuning'),
         click.option('-a', '--autotune', default='aggressive', callback=config_autotuning,
                      type=click.Choice(configuration._accepted['autotuning']),
                      help='Select autotuning mode')
@@ -177,10 +176,19 @@ def run(problem, **kwargs):
     # Should a specific block-shape be used? Useful if one wants to skip
     # the autotuning pass as a good block-shape is already known
     if block_shapes:
-        # This is horribly hacky, but it works for now
-        for i, bs in enumerate(block_shapes):
-            for d, s in zip(['x', 'y', 'z'], bs):
-                options['%s0_blk%d_size' % (d, i)] = s
+        # The following piece of code is horribly hacky, but it works for now
+        for i, block_shape in enumerate(block_shapes):
+            bs = [int(x) for x in block_shape.split()]
+            # If hierarchical blocking is activated, say with N levels, here in
+            # `bs` we expect to see 3*N entries
+            levels = [bs[x:x+3] for x in range(0, len(bs), 3)]
+            for n, level in enumerate(levels):
+                if len(level) != 3:
+                    raise ValueError("Expected 3 entries per block shape level, "
+                                     "but got one level with only %s entries (`%s`)"
+                                     % (len(level), level))
+                for d, s in zip(['x', 'y', 'z'], level):
+                    options['%s%d_blk%d_size' % (d, i, n)] = s
 
     solver = setup(space_order=space_order, time_order=time_order, **kwargs)
     solver.forward(autotune=autotune, **options)
@@ -193,6 +201,8 @@ def cli_test(problem, **kwargs):
     """
     Test numerical correctness with different parameters.
     """
+    set_log_level('ERROR')
+
     test(problem, **kwargs)
 
 
@@ -431,9 +441,9 @@ def get_ob_exec(func):
             gflopss, oi, timings, _ = self.func(*args, **kwargs)
 
             for key in timings.keys():
-                self.register(gflopss[key], measure="gflopss", event=key)
-                self.register(oi[key], measure="oi", event=key)
-                self.register(timings[key], measure="timings", event=key)
+                self.register(gflopss[key], measure="gflopss", event=key.name)
+                self.register(oi[key], measure="oi", event=key.name)
+                self.register(timings[key], measure="timings", event=key.name)
 
     return DevitoExecutor(func)
 
@@ -451,13 +461,18 @@ def get_ob_plotter():
 
 if __name__ == "__main__":
     # If running with MPI, we emit logging messages from rank0 only
-    MPI.Init()  # Devito starts off with MPI disabled!
-    set_log_level('DEBUG', comm=MPI.COMM_WORLD)
+    try:
+        MPI.Init()  # Devito starts off with MPI disabled!
+        set_log_level('DEBUG', comm=MPI.COMM_WORLD)
 
-    if MPI.COMM_WORLD.size > 1 and not configuration['mpi']:
-        warning("It seems that you're running over MPI with %d processes, but "
-                "DEVITO_MPI is unset. Setting `DEVITO_MPI=basic`...")
-        configuration['mpi'] = 'basic'
+        if MPI.COMM_WORLD.size > 1 and not configuration['mpi']:
+            warning("It seems that you're running over MPI with %d processes, but "
+                    "DEVITO_MPI is unset. Setting `DEVITO_MPI=basic`..."
+                    % MPI.COMM_WORLD.size)
+            configuration['mpi'] = 'basic'
+    except TypeError:
+        # MPI not available
+        pass
 
     # Profiling at max level
     configuration['profiling'] = 'advanced'

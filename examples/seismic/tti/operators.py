@@ -13,6 +13,8 @@ def second_order_stencil(model, u, v, H0, Hz):
     """
     # Stencils
     m, damp, delta, epsilon = model.m, model.damp, model.delta, model.epsilon
+    epsilon = 1 + 2 * epsilon
+    delta = sqrt(1 + 2 * delta)
     s = model.grid.stepping_dim.spacing
 
     stencilp = 1.0 / (2.0 * m + s * damp) * \
@@ -272,6 +274,8 @@ def kernel_staggered_2d(model, u, v, space_order):
     """
     dampl = 1 - model.damp
     m, epsilon, delta, theta = (model.m, model.epsilon, model.delta, model.theta)
+    epsilon = 1 + 2 * epsilon
+    delta = sqrt(1 + 2 * delta)
     s = model.grid.stepping_dim.spacing
     x, z = model.grid.dimensions
     # Staggered setup
@@ -308,6 +312,8 @@ def kernel_staggered_3d(model, u, v, space_order):
     dampl = 1 - model.damp
     m, epsilon, delta, theta, phi = (model.m, model.epsilon, model.delta,
                                      model.theta, model.phi)
+    epsilon = 1 + 2 * epsilon
+    delta = sqrt(1 + 2 * delta)
     s = model.grid.stepping_dim.spacing
     x, y, z = model.grid.dimensions
     # Staggered setup
