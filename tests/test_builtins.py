@@ -23,6 +23,7 @@ class TestGaussianSmooth(object):
 
         assert np.all(sp_smoothed - np.array(dv_smoothed) == 0)
 
+    @skipif(['nompi'])
     @pytest.mark.parallel(mode=4)
     def test_gs_parallel(self):
         a = np.arange(64).reshape((8, 8))
