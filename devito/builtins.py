@@ -58,12 +58,12 @@ def gaussian_smooth(f, sigma=1, _order=4, mode='reflect'):
     """
     Gaussian smooth function.
     """
-    class DataDomain(dv.SubDomain):
+    class ObjectiveDomain(dv.SubDomain):
 
-        name = 'datadomain'
+        name = 'objective_domain'
 
         def __init__(self, lw):
-            super(DataDomain, self).__init__()
+            super(ObjectiveDomain, self).__init__()
             self.lw = lw
 
         def define(self, dimensions):
@@ -146,13 +146,12 @@ def gaussian_smooth(f, sigma=1, _order=4, mode='reflect'):
     lw = int(_order*sigma + 0.5)
 
     # Create the padded grid:
-    datadomain = DataDomain(lw)
-    # FIMXE: change to type test
+    objective_domain = ObjectiveDomain(lw)
     try:
         shape_padded = np.array(f.grid.shape) + 2*lw
     except AttributeError:
         shape_padded = np.array(f.shape) + 2*lw
-    grid = dv.Grid(shape=shape_padded, subdomains=datadomain)
+    grid = dv.Grid(shape=shape_padded, subdomains=objective_domain)
     dims = grid.dimensions
 
     f_c = dv.Function(name='f_c', grid=grid, space_order=2*lw,
@@ -170,7 +169,7 @@ def gaussian_smooth(f, sigma=1, _order=4, mode='reflect'):
         coeffs = dv.Coefficient(1, f_c, d, weights)
 
         expr = dv.Eq(f_o, rhs, coefficients=dv.Substitutions(coeffs),
-                     subdomain=grid.subdomains['datadomain'])
+                     subdomain=grid.subdomains['objective_domain'])
         op = dv.Operator(expr)
         op.apply()
 
