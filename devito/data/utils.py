@@ -227,7 +227,7 @@ def mpi_index_maps(loc_idx, shape, topology, coords, comm):
         dat_len[coords[j]] = comm.bcast(shape, root=j)
         if any(k == 0 for k in dat_len[coords[j]]):
             dat_len[coords[j]] = as_tuple([0]*len(dat_len[coords[j]]))
-    dat_len_cum = distributed_data_size(dat_len, coords, topology, nprocs)
+    dat_len_cum = distributed_data_size(dat_len, coords, topology)
     # This 'transform' will be required to produce the required maps
     transform = []
     for i in as_tuple(loc_idx):
@@ -312,6 +312,43 @@ def mpi_index_maps(loc_idx, shape, topology, coords, comm):
 
 
 def flip_idx(idx, decomposition):
+    """
+    This function serves two purposes:
+    1) To Convert a global index with containing a slice with step < 0 to a 'mirrored'
+       index with all slice steps > 0.
+    2) Normalize indices with slices containing negative start/stops.
+
+    Parameters
+    ----------
+    idx: Tuple of slices/ints/tuples
+        Representation of the indices that require processing.
+    decomposition : tuple of Decomposition
+        The data decomposition, for each dimension.
+
+    Examples
+    --------
+    In the following examples, the domain consists of 12 indices, split over
+    four subdomains [0, 3]. We pick 2 as local subdomain.
+
+    >>> from devito.data import Decomposition, flip_idx
+    >>> d = Decomposition([[0, 1, 2], [3, 4], [5, 6, 7], [8, 9, 10, 11]], 2)
+    >>> d
+    Decomposition([0,2], [3,4], <<[5,7]>>, [8,11])
+
+    Example with negative stepped slices:
+
+    >>> idx = (slice(4, None, -1))
+    >>> fidx = flip_idx(idx, (d,))
+    >>> fidx
+    (slice(None, 5, 1),)
+
+    Example with negative start/stops:
+
+    >>> idx2 = (slice(-4, -1, 1))
+    >>> fidx2 = flip_idx(idx2, (d,))
+    >>> fidx2
+    (slice(8, 11, 1),)
+    """
     processed = []
     for i, j in zip(as_tuple(idx), decomposition):
         if isinstance(i, slice) and i.step is not None and i.step < 0:
@@ -343,10 +380,31 @@ def flip_idx(idx, decomposition):
     return as_tuple(processed)
 
 
-def distributed_data_size(shape, coords, topology, nprocs):
-    # Compute the cumulative shape of the distributed data
+def distributed_data_size(shape, coords, topology):
+    """
+    Compute the cumulative shape of the distributed data (cshape).
+
+    coords: Array containing the local shape of data to each rank.
+
+    send: Array of rank coordinates corresponding to coords.
+
+    topology: Topology of the associated distributor.
+
+    Examples
+    --------
+    Given a set of distributed data such that:
+
+    shape = [[ (2, 2), (2, 2)],
+             [ (2, 2), (2, 2)]],
+
+    (that is, there are 4 ranks and the data on each rank has shape (2, 2)).
+    cshape will be returned as
+
+    cshape = [[ (2, 2), (2, 4)],
+              [ (4, 2), (4, 4)]].
+    """
     cshape = np.zeros(topology, dtype=tuple)
-    for i in range(nprocs):
+    for i in range(len(coords)):
         my_coords = coords[i]
         if i == 0:
             cshape[my_coords] = shape[my_coords]
