@@ -301,7 +301,7 @@ class AbstractSparseFunction(DiscreteFunction, Differentiable):
     def eval_at(self, var):
         return self
 
-    def _arg_apply(self, dataobj, alias=None):
+    def _arg_apply(self, dataobj, coordsobj, alias=None):
         key = alias if alias is not None else self
         if isinstance(key, AbstractSparseFunction):
             # Gather into `self.data`

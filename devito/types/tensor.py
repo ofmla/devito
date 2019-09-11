@@ -7,16 +7,16 @@ from sympy.core.decorators import call_highest_priority
 
 from devito.finite_differences import Differentiable
 from devito.logger import error
-from devito.types.utils import NODE
-from devito.types.basic import AbstractCachedTensor
+from devito.types.basic import AbstractCachedTensor, Basic
 from devito.types.dense import Function, TimeFunction
+from devito.types.utils import NODE
 
 __all__ = ['TensorFunction', 'TensorTimeFunction', 'VectorFunction', 'VectorTimeFunction']
 
 
 class TensorFunction(AbstractCachedTensor, Differentiable):
     """
-    Tensor valued Function represented as an ImmutableMatrix.
+    Tensor valued Function represented as a Matrix.
     Each component is a Function or TimeFunction.
 
     A TensorFunction and the classes that inherit from it takes the same parameters as
@@ -104,68 +104,67 @@ class TensorFunction(AbstractCachedTensor, Differentiable):
         a VectorFunction or a Function/scalar.
         """
         other = sympy.sympify(other)
-        try:
-            # Scalar Mul
-            if other.is_Function:
-                return self._eval_scalar_rmul(other)
-            # Product of two vector
-            elif other.is_VectorValued and self.is_VectorValued:
-                # Incorrect size
-                if self.is_transposed == other.is_transposed:
-                    error("Incompatible sizes")
-                # Inner product
-                elif self.is_transposed and not other.is_transposed:
-                    return sympy.prod(s1*s2 for s1, s2 in zip(self, other))
-                # Outer product
-                else:
-                    # Only option left but double check
-                    assert not self.is_transposed and other.is_transposed
-
-                    def entry(i, j):
-                        return sum(self[i]*other[j] for k in range(self.cols))
-                    comps = [[entry(i, j) for i in range(self.cols)]
-                             for j in range(self.rows)]
-                    func = tens_func(self, other)
-                    name = "%s%s" % (self.name, other.name)
-                    to = getattr(self, 'time_order', 0)
-                    return func(name=name, grid=self.grid, space_order=self.space_order,
-                                components=comps, time_order=to, symmetric=False,
-                                diagonal=False)
-            # MatVec product
-            elif other.is_VectorValued:
-                assert other.shape[0] == self.shape[1]
-
-                def entry(i):
-                    return sum(self[i, k]*other[k] for k in range(self.cols))
-                comps = [entry(i) for i in range(self.cols)]
-                func = vec_func(self, other)
-                name = "%s%s" % (self.name, other.name)
-                to = getattr(self, 'time_order', 0)
-                return func(name=name, grid=self.grid, space_order=self.space_order,
-                            components=comps, time_order=to)
-            # MatMat product
-            elif other.is_TensorValued:
-                assert other.shape[0] == self.shape[1]
+        # If multiply by a non Devito type defaults to sympy MatVec
+        if not isinstance(other, Basic):
+            return super(TensorFunction, self).__mul__(other)
+        # Scalar Mul
+        if other.is_Function:
+            return self._eval_scalar_rmul(other)
+        # Product of two vector
+        elif other.is_VectorValued and self.is_VectorValued:
+            # Incorrect size
+            if self.is_transposed == other.is_transposed:
+                error("Incompatible sizes")
+            # Inner product
+            elif self.is_transposed and not other.is_transposed:
+                return sympy.prod(s1*s2 for s1, s2 in zip(self, other))
+            # Outer product
+            else:
+                # Only option left but double check
+                assert not self.is_transposed and other.is_transposed
 
                 def entry(i, j):
-                    return sum(self[i, k]*other[k, j] for k in range(self.cols))
+                    return sum(self[i]*other[j] for k in range(self.cols))
                 comps = [[entry(i, j) for i in range(self.cols)]
                          for j in range(self.rows)]
                 func = tens_func(self, other)
                 name = "%s%s" % (self.name, other.name)
                 to = getattr(self, 'time_order', 0)
-                is_diag = self.is_diagonal and other.is_diagonal
-                is_symm = ((self.is_symmetric and other.is_symmetric) or
-                           (self.is_symmetric and other.is_diagonal) or
-                           (other.is_symmetric and self.is_diagonal))
                 return func(name=name, grid=self.grid, space_order=self.space_order,
-                            components=comps, time_order=to, symmetric=is_symm,
-                            diagonal=is_diag)
-            # All cases should be covered but defaults to sympy if in another case
-            else:
-                return super(TensorFunction, self).__mul__(other)
-        except AttributeError:
-            # If custom product fails defaults to sympy if in another case
+                            components=comps, time_order=to, symmetric=False,
+                            diagonal=False)
+        # MatVec product
+        elif other.is_VectorValued:
+            assert other.shape[0] == self.shape[1]
+
+            def entry(i):
+                return sum(self[i, k]*other[k] for k in range(self.cols))
+            comps = [entry(i) for i in range(self.cols)]
+            func = vec_func(self, other)
+            name = "%s%s" % (self.name, other.name)
+            to = getattr(self, 'time_order', 0)
+            return func(name=name, grid=self.grid, space_order=self.space_order,
+                        components=comps, time_order=to)
+        # MatMat product
+        elif other.is_TensorValued:
+            assert other.shape[0] == self.shape[1]
+
+            def entry(i, j):
+                return sum(self[i, k]*other[k, j] for k in range(self.cols))
+            comps = [[entry(i, j) for i in range(self.cols)]
+                     for j in range(self.rows)]
+            func = tens_func(self, other)
+            name = "%s%s" % (self.name, other.name)
+            to = getattr(self, 'time_order', 0)
+            is_diag = self.is_diagonal and other.is_diagonal
+            is_symm = ((self.is_symmetric and other.is_symmetric) or
+                       (self.is_symmetric and other.is_diagonal) or
+                       (other.is_symmetric and self.is_diagonal))
+            return func(name=name, grid=self.grid, space_order=self.space_order,
+                        components=comps, time_order=to, symmetric=is_symm,
+                        diagonal=is_diag)
+        # All cases should be covered but defaults to sympy if in another case
+        else:
             return super(TensorFunction, self).__mul__(other)
 
     def __rmul__(self, other):

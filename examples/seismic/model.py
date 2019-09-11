@@ -550,9 +550,9 @@ class GenericModel(object):
         return {i.name: kwargs.get(i.name, i) or i for i in known}
 
     def _gen_phys_param(self, field, name, space_order, is_param=False,
-                        default_val=0):
+                        default_value=0):
         if field is None:
-            return default_val
+            return default_value
         if isinstance(field, np.ndarray):
             function = Function(name=name, grid=self.grid, space_order=space_order,
                                 parameter=is_param)
@@ -602,16 +602,6 @@ class GenericModel(object):
         Physical size of the domain as determined by shape and spacing
         """
         return tuple((d-1) * s for d, s in zip(self.shape, self.spacing))
-
-    def _gen_phys_param(self, field, name, space_order, default_value=0):
-        if field is None:
-            return default_value
-        if isinstance(field, np.ndarray):
-            function = Function(name=name, grid=self.grid, space_order=space_order)
-            initialize_function(function, field, self.nbpml)
-        else:
-            function = Constant(name=name, value=field)
-        return function
 
 
 class Model(GenericModel):
@@ -784,7 +774,7 @@ class ModelElastic(GenericModel):
         # The CFL condtion is then given by
         # dt < h / (sqrt(2) * max(vp)))
         coeff = np.sqrt(3) if len(self.shape) == 3 else np.sqrt(3)
-        return self.dtype(.95*mmin(self.spacing) / (coeff*self.maxvp))
+        return self.dtype(.95*np.min(self.spacing) / (coeff*self.maxvp))
 
 
 class ModelViscoelastic(ModelElastic):
@@ -846,5 +836,5 @@ class ModelViscoelastic(ModelElastic):
         # imaging, and inversion: methodology, computational aspects and sensitivity"
         # for further details:
         # FIXME: Fix 'Constant' so that that mmax(self.vp) returns the data value
-        return self.dtype(6.*mmin(self.spacing) /
+        return self.dtype(6.*np.min(self.spacing) /
                           (7.*np.sqrt(self.grid.dim)*self.maxvp))
