@@ -8,7 +8,7 @@ from devito import (Grid, SubDomain, Function, Constant, mmax,
                     SubDimension, Eq, Inc, Operator)
 from devito.tools import as_tuple
 
-__all__ = ['Model', 'ModelElastic', 'ModelViscoelastic', 'demo_model']
+__all__ = ['Model', 'ModelViscoacustic', 'ModelElastic', 'ModelViscoelastic', 'demo_model']
 
 
 def demo_model(preset, **kwargs):
@@ -442,11 +442,14 @@ def initialize_damp(damp, nbpml, spacing, mask=False):
 
     eqs = [Eq(damp, 1.0)] if mask else []
     for d in damp.dimensions:
-        # left
         dim_l = SubDimension.left(name='abc_%s_l' % d.name, parent=d,
                                   thickness=nbpml)
+        #print(dim_l)
+        #print(d.symbolic_min)
         pos = Abs((nbpml - (dim_l - d.symbolic_min) + 1) / float(nbpml))
+        #print(pos)
         val = dampcoeff * (pos - sin(2*np.pi*pos)/(2*np.pi))
+        #print(val)
         val = -val if mask else val
         eqs += [Inc(damp.subs({d: dim_l}), val/d.spacing)]
         # right
@@ -458,8 +461,10 @@ def initialize_damp(damp, nbpml, spacing, mask=False):
         eqs += [Inc(damp.subs({d: dim_r}), val/d.spacing)]
 
     # TODO: Figure out why yask doesn't like it with dse/dle
-    Operator(eqs, name='initdamp', dse='noop', dle='noop')()
-
+    #print(eqs)
+    op=Operator(eqs, name='initdamp', dse='noop', dle='noop')
+    #print(op)
+    op()
 
 def initialize_function(function, data, nbpml):
     """
@@ -629,7 +634,7 @@ class Model(GenericModel):
         The damping field for absorbing boundary condition.
     """
     def __init__(self, origin, spacing, shape, space_order, vp, nbpml=20,
-                 dtype=np.float32, epsilon=None, delta=None, theta=None, phi=None,
+                 dtype=np.float32, epsilon=None, delta=None, theta=None, phi=None,rho=None,
                  subdomains=(), **kwargs):
         super(Model, self).__init__(origin, spacing, shape, space_order, nbpml, dtype,
                                     subdomains)
@@ -640,6 +645,10 @@ class Model(GenericModel):
         self._vp = self._gen_phys_param(vp, 'vp', space_order)
         physical_parameters.append('vp')
         self._max_vp = np.max(vp)
+
+        self.rho = self._gen_phys_param(rho, 'rho', space_order)
+        if self.rho != 0:
+            physical_parameters.append('rho')
 
         # Additional parameter fields for TTI operators
         self.epsilon = self._gen_phys_param(epsilon, 'epsilon', space_order)
@@ -717,6 +726,25 @@ class Model(GenericModel):
     @property
     def m(self):
         return 1 / (self.vp * self.vp)
+
+class ModelViscoacustic(Model):
+    def __init__(self, origin, spacing, shape, space_order, vp, qp, w0, nbpml=20,
+                 dtype=np.float32, epsilon=None, delta=None, theta=None, phi=None,
+                 subdomains=(), **kwargs):
+        super(ModelViscoacustic, self).__init__(origin, spacing, shape, space_order, vp, nbpml=nbpml, 
+                                    dtype=dtype,subdomains=subdomains)
+
+        physical_parameters = list(self._physical_parameters)
+
+        self.qp = self._gen_phys_param(qp, 'qp', space_order)
+        physical_parameters.append('qp')
+        self.w0 = w0
+
+        self._physical_parameters = as_tuple(physical_parameters)
+
+    @property
+    def eta(self):
+        return (self.vp * self.vp)/ (self.qp * self.w0)
 
 
 class ModelElastic(GenericModel):

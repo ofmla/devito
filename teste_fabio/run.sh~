@@ -1,0 +1,6 @@
+#!/bin/bash
+
+for nrun in {1..3}
+do 
+ ./submit.sh $nrun
+done

@@ -1,0 +1,486 @@
+Build grid space
+using initial model with v lin. increasing with depth
+Build vertical grid space
+using lambda=v/f
+Build horizontal grid space
+using R=sqrt(lambda*z/2)
+Build grid coordinates
+this coarse grid has  168  points
+Forward modeling took 275.97452783584595
+1501006682.0
+Filename: ./utest_nodask_naws.py
+
+Line #    Mem usage    Increment   Line Contents
+================================================
+    49    622.7 MiB    622.7 MiB   @profile
+    50                             def my_task(part,op,param,dobs,src,src_coor,rec):
+    51                             
+    52    622.7 MiB      0.0 MiB       error=0.
+    53    626.6 MiB      3.9 MiB       model=get_true_model(part*(1/1000.),param)
+    54    638.4 MiB     11.8 MiB       op.arguments()
+    55    638.4 MiB      0.0 MiB       tstart = time.time()
+    56                                 # Geometry 
+    57                                 # Create symbols for forward wavefield, source and receivers
+    58                             
+    59                             
+    60                                 #source_locations= numpy.empty((1, 2))
+    61                                 #geometry = AcquisitionGeometry(model_part, rec_coor, source_locations,
+    62                                 #                               param['t0'], param['tn'], src_type='Ricker',
+    63                                 #                               f0=param['f0'])
+    64                                 #geometry.resample(param['dt'])
+    65                                 #print(geometry.nt) 
+    66                             
+    67                                 # Set up solver.
+    68                                 #solver = AcousticWaveSolver(model_part, geometry, space_order=param['space_order'])
+    69                                 #print("{:>30}: {:>8}".format('solver',sizeof_fmt(sys.getsizeof(solver))))
+    70                             
+    71                             
+    72                                 #tracemalloc.start()
+    73                                 #start=tracemalloc.take_snapshot()
+    74                                 #prev=start
+    75    666.2 MiB      0.0 MiB       for i in  range(len(dobs[0][0])):
+    76                                 #for i in  range(5):
+    77                                   #dcalc=generate_shotdata_i(numpy.array([src_coor[i]]), geometry, solver, model_part)
+    78    666.2 MiB      0.0 MiB         src.coordinates.data[0, :]=numpy.array([src_coor[i]])
+    79                                   #op(time=time_range.num-1, dt=param['dt'])
+    80    666.2 MiB      0.1 MiB         op(damp=model.damp, vp=model.vp, time=time_range.num-1, dt=model.critical_dt, rec=rec, src=src)
+    81    666.2 MiB      9.1 MiB         dcalc=numpy.array(rec.data)
+    82    666.2 MiB      9.3 MiB         res=get_value(dcalc,dobs[:,:,i])
+    83    666.2 MiB      0.0 MiB         u.data.fill(0)
+    84    666.2 MiB      0.0 MiB         error += res
+    85                                   #clear_cache()
+    86                                   #trace_leak(start,prev)
+    87                                 #print("{:>30}: {:>8}".format('dcalc',sizeof_fmt(sys.getsizeof(dcalc))))
+    88                                 #print("{:>30}: {:>8}".format('res',sizeof_fmt(sys.getsizeof(res))))
+    89                                 #print("{:>30}: {:>8}".format('error',sizeof_fmt(sys.getsizeof(error))))
+    90                             
+    91                             
+    92                                 #dcalc=None
+    93                                 #model=None
+    94                                 #del dcalc,model
+    95                             
+    96    656.9 MiB      0.0 MiB       print("Forward modeling took {}".format(time.time() - tstart))
+    97    656.9 MiB      0.0 MiB       print(error)
+    98    656.9 MiB      0.0 MiB       return (error,)
+
+
+(1501006682.0,)
+[ Top Diffs since Start ]
+top_diffs i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:0: size=225 KiB (+225 KiB), count=1020 (+1020), average=226 B
+top_diffs i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:0: size=217 KiB (+217 KiB), count=1555 (+1555), average=143 B
+top_diffs i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:0: size=164 KiB (+164 KiB), count=1146 (+1146), average=146 B
+top_diffs i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/numpy/core/_internal.py:0: size=76.7 KiB (+76.7 KiB), count=828 (+828), average=95 B
+top_diffs i: 5 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/basic.py:0: size=60.5 KiB (+60.5 KiB), count=435 (+435), average=142 B
+top_diffs i: 6 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/expr.py:0: size=50.1 KiB (+50.1 KiB), count=467 (+467), average=110 B
+top_diffs i: 7 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/finite_differences/tools.py:0: size=47.8 KiB (+47.8 KiB), count=614 (+614), average=80 B
+top_diffs i: 8 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:0: size=47.2 KiB (+47.2 KiB), count=92 (+92), average=526 B
+top_diffs i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:0: size=45.0 KiB (+45.0 KiB), count=552 (+552), average=84 B
+top_diffs i: 10 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/dense.py:0: size=38.8 KiB (+38.8 KiB), count=456 (+456), average=87 B
+[ Top Incremental ]
+top_incremental i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:372: size=216 KiB (+216 KiB), count=1543 (+1543), average=143 B
+top_incremental i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:466: size=80.0 KiB (+80.0 KiB), count=223 (+223), average=368 B
+top_incremental i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:742: size=72.0 KiB (+72.0 KiB), count=1 (+1), average=72.0 KiB
+top_incremental i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:738: size=72.0 KiB (+72.0 KiB), count=1 (+1), average=72.0 KiB
+top_incremental i: 5 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:732: size=69.4 KiB (+69.4 KiB), count=987 (+987), average=72 B
+top_incremental i: 6 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:497: size=47.0 KiB (+47.0 KiB), count=90 (+90), average=535 B
+top_incremental i: 7 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/numpy/core/_internal.py:282: size=44.8 KiB (+44.8 KiB), count=469 (+469), average=98 B
+top_incremental i: 8 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/data/decomposition.py:62: size=33.2 KiB (+33.2 KiB), count=29 (+29), average=1173 B
+top_incremental i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:143: size=32.1 KiB (+32.1 KiB), count=352 (+352), average=93 B
+top_incremental i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:694: size=25.6 KiB (+25.6 KiB), count=328 (+328), average=80 B
+[ Top Current]
+top_current i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:0: size=225 KiB, count=1020, average=226 B
+top_current i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:0: size=217 KiB, count=1555, average=143 B
+top_current i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:0: size=164 KiB, count=1146, average=146 B
+top_current i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/numpy/core/_internal.py:0: size=76.7 KiB, count=828, average=95 B
+top_current i: 5 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/basic.py:0: size=60.5 KiB, count=435, average=142 B
+top_current i: 6 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/expr.py:0: size=50.1 KiB, count=467, average=110 B
+top_current i: 7 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/finite_differences/tools.py:0: size=47.8 KiB, count=614, average=80 B
+top_current i: 8 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:0: size=47.2 KiB, count=92, average=526 B
+top_current i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:0: size=45.0 KiB, count=552, average=84 B
+top_current i: 10 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/dense.py:0: size=38.8 KiB, count=456, average=87 B
+traceback memory_blocks: 1543 size_kB: 216.193359375
+  File "/home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py", line 372
+    path = sep*initial_slashes + path
+Forward modeling took 288.2884747982025
+1501006682.0
+Filename: ./utest_nodask_naws.py
+
+Line #    Mem usage    Increment   Line Contents
+================================================
+    49    639.2 MiB    639.2 MiB   @profile
+    50                             def my_task(part,op,param,dobs,src,src_coor,rec):
+    51                             
+    52    639.2 MiB      0.0 MiB       error=0.
+    53    642.0 MiB      2.9 MiB       model=get_true_model(part*(1/1000.),param)
+    54    642.0 MiB      0.0 MiB       op.arguments()
+    55    642.0 MiB      0.0 MiB       tstart = time.time()
+    56                                 # Geometry 
+    57                                 # Create symbols for forward wavefield, source and receivers
+    58                             
+    59                             
+    60                                 #source_locations= numpy.empty((1, 2))
+    61                                 #geometry = AcquisitionGeometry(model_part, rec_coor, source_locations,
+    62                                 #                               param['t0'], param['tn'], src_type='Ricker',
+    63                                 #                               f0=param['f0'])
+    64                                 #geometry.resample(param['dt'])
+    65                                 #print(geometry.nt) 
+    66                             
+    67                                 # Set up solver.
+    68                                 #solver = AcousticWaveSolver(model_part, geometry, space_order=param['space_order'])
+    69                                 #print("{:>30}: {:>8}".format('solver',sizeof_fmt(sys.getsizeof(solver))))
+    70                             
+    71                             
+    72                                 #tracemalloc.start()
+    73                                 #start=tracemalloc.take_snapshot()
+    74                                 #prev=start
+    75    669.2 MiB      0.0 MiB       for i in  range(len(dobs[0][0])):
+    76                                 #for i in  range(5):
+    77                                   #dcalc=generate_shotdata_i(numpy.array([src_coor[i]]), geometry, solver, model_part)
+    78    669.2 MiB      0.0 MiB         src.coordinates.data[0, :]=numpy.array([src_coor[i]])
+    79                                   #op(time=time_range.num-1, dt=param['dt'])
+    80    669.2 MiB      0.1 MiB         op(damp=model.damp, vp=model.vp, time=time_range.num-1, dt=model.critical_dt, rec=rec, src=src)
+    81    669.2 MiB      8.5 MiB         dcalc=numpy.array(rec.data)
+    82    669.2 MiB      9.3 MiB         res=get_value(dcalc,dobs[:,:,i])
+    83    669.2 MiB      0.0 MiB         u.data.fill(0)
+    84    669.2 MiB      0.0 MiB         error += res
+    85                                   #clear_cache()
+    86                                   #trace_leak(start,prev)
+    87                                 #print("{:>30}: {:>8}".format('dcalc',sizeof_fmt(sys.getsizeof(dcalc))))
+    88                                 #print("{:>30}: {:>8}".format('res',sizeof_fmt(sys.getsizeof(res))))
+    89                                 #print("{:>30}: {:>8}".format('error',sizeof_fmt(sys.getsizeof(error))))
+    90                             
+    91                             
+    92                                 #dcalc=None
+    93                                 #model=None
+    94                                 #del dcalc,model
+    95                             
+    96    669.2 MiB      0.0 MiB       print("Forward modeling took {}".format(time.time() - tstart))
+    97    669.2 MiB      0.0 MiB       print(error)
+    98    669.2 MiB      0.0 MiB       return (error,)
+
+
+(1501006682.0,)
+[ Top Diffs since Start ]
+top_diffs i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:0: size=232 KiB (+232 KiB), count=1040 (+1040), average=228 B
+top_diffs i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:0: size=217 KiB (+217 KiB), count=1555 (+1555), average=143 B
+top_diffs i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:0: size=217 KiB (+217 KiB), count=1557 (+1557), average=142 B
+top_diffs i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:0: size=205 KiB (+205 KiB), count=684 (+684), average=307 B
+top_diffs i: 5 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/basic.py:0: size=108 KiB (+108 KiB), count=718 (+718), average=154 B
+top_diffs i: 6 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/finite_differences/tools.py:0: size=95.6 KiB (+95.6 KiB), count=1227 (+1227), average=80 B
+top_diffs i: 7 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/tracemalloc.py:0: size=81.5 KiB (+81.5 KiB), count=959 (+959), average=87 B
+top_diffs i: 8 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:0: size=68.4 KiB (+68.4 KiB), count=852 (+852), average=82 B
+top_diffs i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:0: size=67.1 KiB (+67.1 KiB), count=127 (+127), average=541 B
+top_diffs i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/printing/printer.py:0: size=57.9 KiB (+57.9 KiB), count=501 (+501), average=118 B
+[ Top Incremental ]
+top_incremental i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:372: size=216 KiB (+216 KiB), count=1543 (+1543), average=143 B
+top_incremental i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:143: size=201 KiB (+201 KiB), count=659 (+659), average=312 B
+top_incremental i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:466: size=103 KiB (+103 KiB), count=307 (+307), average=345 B
+top_incremental i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:742: size=72.0 KiB (+72.0 KiB), count=1 (+1), average=72.0 KiB
+top_incremental i: 5 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:738: size=72.0 KiB (+72.0 KiB), count=1 (+1), average=72.0 KiB
+top_incremental i: 6 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:732: size=69.4 KiB (+69.4 KiB), count=987 (+987), average=72 B
+top_incremental i: 7 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:497: size=66.0 KiB (+66.0 KiB), count=117 (+117), average=578 B
+top_incremental i: 8 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/linecache.py:137: size=57.6 KiB (+57.6 KiB), count=616 (+616), average=96 B
+top_incremental i: 9 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/data/decomposition.py:62: size=55.6 KiB (+55.6 KiB), count=47 (+47), average=1212 B
+top_incremental i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:694: size=47.3 KiB (+47.3 KiB), count=606 (+606), average=80 B
+[ Top Current]
+top_current i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:0: size=232 KiB, count=1040, average=228 B
+top_current i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:0: size=217 KiB, count=1555, average=143 B
+top_current i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:0: size=217 KiB, count=1557, average=142 B
+top_current i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:0: size=205 KiB, count=684, average=307 B
+top_current i: 5 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/basic.py:0: size=108 KiB, count=718, average=154 B
+top_current i: 6 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/finite_differences/tools.py:0: size=95.6 KiB, count=1227, average=80 B
+top_current i: 7 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/tracemalloc.py:0: size=81.5 KiB, count=959, average=87 B
+top_current i: 8 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:0: size=68.4 KiB, count=852, average=82 B
+top_current i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:0: size=67.1 KiB, count=127, average=541 B
+top_current i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/printing/printer.py:0: size=57.9 KiB, count=501, average=118 B
+traceback memory_blocks: 1543 size_kB: 216.193359375
+  File "/home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py", line 372
+    path = sep*initial_slashes + path
+Forward modeling took 298.2568337917328
+1501006682.0
+Filename: ./utest_nodask_naws.py
+
+Line #    Mem usage    Increment   Line Contents
+================================================
+    49    640.3 MiB    640.3 MiB   @profile
+    50                             def my_task(part,op,param,dobs,src,src_coor,rec):
+    51                             
+    52    640.3 MiB      0.0 MiB       error=0.
+    53    643.3 MiB      3.0 MiB       model=get_true_model(part*(1/1000.),param)
+    54    643.3 MiB      0.0 MiB       op.arguments()
+    55    643.3 MiB      0.0 MiB       tstart = time.time()
+    56                                 # Geometry 
+    57                                 # Create symbols for forward wavefield, source and receivers
+    58                             
+    59                             
+    60                                 #source_locations= numpy.empty((1, 2))
+    61                                 #geometry = AcquisitionGeometry(model_part, rec_coor, source_locations,
+    62                                 #                               param['t0'], param['tn'], src_type='Ricker',
+    63                                 #                               f0=param['f0'])
+    64                                 #geometry.resample(param['dt'])
+    65                                 #print(geometry.nt) 
+    66                             
+    67                                 # Set up solver.
+    68                                 #solver = AcousticWaveSolver(model_part, geometry, space_order=param['space_order'])
+    69                                 #print("{:>30}: {:>8}".format('solver',sizeof_fmt(sys.getsizeof(solver))))
+    70                             
+    71                             
+    72                                 #tracemalloc.start()
+    73                                 #start=tracemalloc.take_snapshot()
+    74                                 #prev=start
+    75    661.6 MiB      0.0 MiB       for i in  range(len(dobs[0][0])):
+    76                                 #for i in  range(5):
+    77                                   #dcalc=generate_shotdata_i(numpy.array([src_coor[i]]), geometry, solver, model_part)
+    78    661.6 MiB      0.0 MiB         src.coordinates.data[0, :]=numpy.array([src_coor[i]])
+    79                                   #op(time=time_range.num-1, dt=param['dt'])
+    80    661.6 MiB      0.2 MiB         op(damp=model.damp, vp=model.vp, time=time_range.num-1, dt=model.critical_dt, rec=rec, src=src)
+    81    661.6 MiB      8.7 MiB         dcalc=numpy.array(rec.data)
+    82    661.6 MiB      9.3 MiB         res=get_value(dcalc,dobs[:,:,i])
+    83    661.6 MiB      0.0 MiB         u.data.fill(0)
+    84    661.6 MiB      0.0 MiB         error += res
+    85                                   #clear_cache()
+    86                                   #trace_leak(start,prev)
+    87                                 #print("{:>30}: {:>8}".format('dcalc',sizeof_fmt(sys.getsizeof(dcalc))))
+    88                                 #print("{:>30}: {:>8}".format('res',sizeof_fmt(sys.getsizeof(res))))
+    89                                 #print("{:>30}: {:>8}".format('error',sizeof_fmt(sys.getsizeof(error))))
+    90                             
+    91                             
+    92                                 #dcalc=None
+    93                                 #model=None
+    94                                 #del dcalc,model
+    95                             
+    96    661.6 MiB      0.0 MiB       print("Forward modeling took {}".format(time.time() - tstart))
+    97    661.6 MiB      0.0 MiB       print(error)
+    98    661.6 MiB      0.0 MiB       return (error,)
+
+
+(1501006682.0,)
+[ Top Diffs since Start ]
+top_diffs i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:0: size=421 KiB (+421 KiB), count=989 (+989), average=436 B
+top_diffs i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:0: size=217 KiB (+217 KiB), count=1556 (+1556), average=143 B
+top_diffs i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/tracemalloc.py:0: size=204 KiB (+204 KiB), count=2783 (+2783), average=75 B
+top_diffs i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:0: size=194 KiB (+194 KiB), count=486 (+486), average=409 B
+top_diffs i: 5 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:0: size=191 KiB (+191 KiB), count=1364 (+1364), average=143 B
+top_diffs i: 6 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/basic.py:0: size=152 KiB (+152 KiB), count=862 (+862), average=181 B
+top_diffs i: 7 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:0: size=94.3 KiB (+94.3 KiB), count=1196 (+1196), average=81 B
+top_diffs i: 8 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/finite_differences/tools.py:0: size=92.8 KiB (+92.8 KiB), count=1193 (+1193), average=80 B
+top_diffs i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/numpy/core/_internal.py:0: size=72.5 KiB (+72.5 KiB), count=738 (+738), average=101 B
+top_diffs i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:0: size=68.6 KiB (+68.6 KiB), count=136 (+136), average=517 B
+[ Top Incremental ]
+top_incremental i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:143: size=417 KiB (+417 KiB), count=962 (+962), average=444 B
+top_incremental i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:372: size=216 KiB (+216 KiB), count=1543 (+1543), average=143 B
+top_incremental i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:466: size=91.8 KiB (+91.8 KiB), count=265 (+265), average=355 B
+top_incremental i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:742: size=72.0 KiB (+72.0 KiB), count=1 (+1), average=72.0 KiB
+top_incremental i: 5 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:738: size=72.0 KiB (+72.0 KiB), count=1 (+1), average=72.0 KiB
+top_incremental i: 6 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:694: size=68.5 KiB (+68.5 KiB), count=877 (+877), average=80 B
+top_incremental i: 7 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:497: size=67.1 KiB (+67.1 KiB), count=119 (+119), average=578 B
+top_incremental i: 8 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/tracemalloc.py:185: size=67.0 KiB (+67.0 KiB), count=1072 (+1072), average=64 B
+top_incremental i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/linecache.py:137: size=57.6 KiB (+57.6 KiB), count=616 (+616), average=96 B
+top_incremental i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/tracemalloc.py:113: size=49.9 KiB (+49.9 KiB), count=532 (+532), average=96 B
+[ Top Current]
+top_current i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:0: size=421 KiB, count=989, average=436 B
+top_current i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:0: size=217 KiB, count=1556, average=143 B
+top_current i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/tracemalloc.py:0: size=204 KiB, count=2783, average=75 B
+top_current i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:0: size=194 KiB, count=486, average=409 B
+top_current i: 5 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:0: size=191 KiB, count=1364, average=143 B
+top_current i: 6 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/basic.py:0: size=152 KiB, count=862, average=181 B
+top_current i: 7 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:0: size=94.3 KiB, count=1196, average=81 B
+top_current i: 8 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/finite_differences/tools.py:0: size=92.8 KiB, count=1193, average=80 B
+top_current i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/numpy/core/_internal.py:0: size=72.5 KiB, count=738, average=101 B
+top_current i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:0: size=68.6 KiB, count=136, average=517 B
+traceback memory_blocks: 962 size_kB: 416.927734375
+  File "/home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py", line 143
+    return _abc_subclasscheck(cls, subclass)
+Forward modeling took 275.1406955718994
+1501006682.0
+Filename: ./utest_nodask_naws.py
+
+Line #    Mem usage    Increment   Line Contents
+================================================
+    49    643.7 MiB    643.7 MiB   @profile
+    50                             def my_task(part,op,param,dobs,src,src_coor,rec):
+    51                             
+    52    643.7 MiB      0.0 MiB       error=0.
+    53    645.6 MiB      1.9 MiB       model=get_true_model(part*(1/1000.),param)
+    54    645.6 MiB      0.0 MiB       op.arguments()
+    55    645.6 MiB      0.0 MiB       tstart = time.time()
+    56                                 # Geometry 
+    57                                 # Create symbols for forward wavefield, source and receivers
+    58                             
+    59                             
+    60                                 #source_locations= numpy.empty((1, 2))
+    61                                 #geometry = AcquisitionGeometry(model_part, rec_coor, source_locations,
+    62                                 #                               param['t0'], param['tn'], src_type='Ricker',
+    63                                 #                               f0=param['f0'])
+    64                                 #geometry.resample(param['dt'])
+    65                                 #print(geometry.nt) 
+    66                             
+    67                                 # Set up solver.
+    68                                 #solver = AcousticWaveSolver(model_part, geometry, space_order=param['space_order'])
+    69                                 #print("{:>30}: {:>8}".format('solver',sizeof_fmt(sys.getsizeof(solver))))
+    70                             
+    71                             
+    72                                 #tracemalloc.start()
+    73                                 #start=tracemalloc.take_snapshot()
+    74                                 #prev=start
+    75    673.0 MiB      0.0 MiB       for i in  range(len(dobs[0][0])):
+    76                                 #for i in  range(5):
+    77                                   #dcalc=generate_shotdata_i(numpy.array([src_coor[i]]), geometry, solver, model_part)
+    78    673.0 MiB      0.0 MiB         src.coordinates.data[0, :]=numpy.array([src_coor[i]])
+    79                                   #op(time=time_range.num-1, dt=param['dt'])
+    80    673.0 MiB      0.1 MiB         op(damp=model.damp, vp=model.vp, time=time_range.num-1, dt=model.critical_dt, rec=rec, src=src)
+    81    673.0 MiB      8.8 MiB         dcalc=numpy.array(rec.data)
+    82    673.0 MiB      9.3 MiB         res=get_value(dcalc,dobs[:,:,i])
+    83    673.0 MiB      0.0 MiB         u.data.fill(0)
+    84    673.0 MiB      0.0 MiB         error += res
+    85                                   #clear_cache()
+    86                                   #trace_leak(start,prev)
+    87                                 #print("{:>30}: {:>8}".format('dcalc',sizeof_fmt(sys.getsizeof(dcalc))))
+    88                                 #print("{:>30}: {:>8}".format('res',sizeof_fmt(sys.getsizeof(res))))
+    89                                 #print("{:>30}: {:>8}".format('error',sizeof_fmt(sys.getsizeof(error))))
+    90                             
+    91                             
+    92                                 #dcalc=None
+    93                                 #model=None
+    94                                 #del dcalc,model
+    95                             
+    96    663.7 MiB      0.0 MiB       print("Forward modeling took {}".format(time.time() - tstart))
+    97    663.7 MiB      0.0 MiB       print(error)
+    98    663.7 MiB      0.0 MiB       return (error,)
+
+
+(1501006682.0,)
+[ Top Diffs since Start ]
+top_diffs i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:0: size=447 KiB (+447 KiB), count=1284 (+1284), average=356 B
+top_diffs i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:0: size=244 KiB (+244 KiB), count=1783 (+1783), average=140 B
+top_diffs i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:0: size=217 KiB (+217 KiB), count=1553 (+1553), average=143 B
+top_diffs i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/tracemalloc.py:0: size=210 KiB (+210 KiB), count=2854 (+2854), average=75 B
+top_diffs i: 5 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/basic.py:0: size=201 KiB (+201 KiB), count=1143 (+1143), average=180 B
+top_diffs i: 6 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:0: size=200 KiB (+200 KiB), count=503 (+503), average=408 B
+top_diffs i: 7 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/finite_differences/tools.py:0: size=141 KiB (+141 KiB), count=1806 (+1806), average=80 B
+top_diffs i: 8 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:0: size=117 KiB (+117 KiB), count=1469 (+1469), average=81 B
+top_diffs i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:0: size=79.8 KiB (+79.8 KiB), count=155 (+155), average=527 B
+top_diffs i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/printing/printer.py:0: size=79.0 KiB (+79.0 KiB), count=671 (+671), average=121 B
+[ Top Incremental ]
+top_incremental i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:143: size=442 KiB (+442 KiB), count=1250 (+1250), average=362 B
+top_incremental i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:372: size=216 KiB (+216 KiB), count=1543 (+1543), average=143 B
+top_incremental i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:466: size=115 KiB (+115 KiB), count=349 (+349), average=338 B
+top_incremental i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:694: size=89.8 KiB (+89.8 KiB), count=1149 (+1149), average=80 B
+top_incremental i: 5 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:497: size=78.4 KiB (+78.4 KiB), count=139 (+139), average=577 B
+top_incremental i: 6 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:742: size=72.0 KiB (+72.0 KiB), count=1 (+1), average=72.0 KiB
+top_incremental i: 7 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:738: size=72.0 KiB (+72.0 KiB), count=1 (+1), average=72.0 KiB
+top_incremental i: 8 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/data/decomposition.py:62: size=70.6 KiB (+70.6 KiB), count=59 (+59), average=1226 B
+top_incremental i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/linecache.py:137: size=70.6 KiB (+70.6 KiB), count=744 (+744), average=97 B
+top_incremental i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/tracemalloc.py:185: size=65.8 KiB (+65.8 KiB), count=1053 (+1053), average=64 B
+[ Top Current]
+top_current i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:0: size=447 KiB, count=1284, average=356 B
+top_current i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:0: size=244 KiB, count=1783, average=140 B
+top_current i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:0: size=217 KiB, count=1553, average=143 B
+top_current i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/tracemalloc.py:0: size=210 KiB, count=2854, average=75 B
+top_current i: 5 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/basic.py:0: size=201 KiB, count=1143, average=180 B
+top_current i: 6 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:0: size=200 KiB, count=503, average=408 B
+top_current i: 7 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/finite_differences/tools.py:0: size=141 KiB, count=1806, average=80 B
+top_current i: 8 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:0: size=117 KiB, count=1469, average=81 B
+top_current i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:0: size=79.8 KiB, count=155, average=527 B
+top_current i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/printing/printer.py:0: size=79.0 KiB, count=671, average=121 B
+traceback memory_blocks: 1250 size_kB: 441.677734375
+  File "/home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py", line 143
+    return _abc_subclasscheck(cls, subclass)
+Forward modeling took 274.29378843307495
+1501006682.0
+Filename: ./utest_nodask_naws.py
+
+Line #    Mem usage    Increment   Line Contents
+================================================
+    49    645.9 MiB    645.9 MiB   @profile
+    50                             def my_task(part,op,param,dobs,src,src_coor,rec):
+    51                             
+    52    645.9 MiB      0.0 MiB       error=0.
+    53    647.8 MiB      1.9 MiB       model=get_true_model(part*(1/1000.),param)
+    54    647.8 MiB      0.0 MiB       op.arguments()
+    55    647.8 MiB      0.0 MiB       tstart = time.time()
+    56                                 # Geometry 
+    57                                 # Create symbols for forward wavefield, source and receivers
+    58                             
+    59                             
+    60                                 #source_locations= numpy.empty((1, 2))
+    61                                 #geometry = AcquisitionGeometry(model_part, rec_coor, source_locations,
+    62                                 #                               param['t0'], param['tn'], src_type='Ricker',
+    63                                 #                               f0=param['f0'])
+    64                                 #geometry.resample(param['dt'])
+    65                                 #print(geometry.nt) 
+    66                             
+    67                                 # Set up solver.
+    68                                 #solver = AcousticWaveSolver(model_part, geometry, space_order=param['space_order'])
+    69                                 #print("{:>30}: {:>8}".format('solver',sizeof_fmt(sys.getsizeof(solver))))
+    70                             
+    71                             
+    72                                 #tracemalloc.start()
+    73                                 #start=tracemalloc.take_snapshot()
+    74                                 #prev=start
+    75    665.9 MiB      0.0 MiB       for i in  range(len(dobs[0][0])):
+    76                                 #for i in  range(5):
+    77                                   #dcalc=generate_shotdata_i(numpy.array([src_coor[i]]), geometry, solver, model_part)
+    78    665.9 MiB      0.0 MiB         src.coordinates.data[0, :]=numpy.array([src_coor[i]])
+    79                                   #op(time=time_range.num-1, dt=param['dt'])
+    80    665.9 MiB      0.0 MiB         op(damp=model.damp, vp=model.vp, time=time_range.num-1, dt=model.critical_dt, rec=rec, src=src)
+    81    665.9 MiB      8.7 MiB         dcalc=numpy.array(rec.data)
+    82    665.9 MiB      9.3 MiB         res=get_value(dcalc,dobs[:,:,i])
+    83    665.9 MiB      0.0 MiB         u.data.fill(0)
+    84    665.9 MiB      0.0 MiB         error += res
+    85                                   #clear_cache()
+    86                                   #trace_leak(start,prev)
+    87                                 #print("{:>30}: {:>8}".format('dcalc',sizeof_fmt(sys.getsizeof(dcalc))))
+    88                                 #print("{:>30}: {:>8}".format('res',sizeof_fmt(sys.getsizeof(res))))
+    89                                 #print("{:>30}: {:>8}".format('error',sizeof_fmt(sys.getsizeof(error))))
+    90                             
+    91                             
+    92                                 #dcalc=None
+    93                                 #model=None
+    94                                 #del dcalc,model
+    95                             
+    96    665.9 MiB      0.0 MiB       print("Forward modeling took {}".format(time.time() - tstart))
+    97    665.9 MiB      0.0 MiB       print(error)
+    98    665.9 MiB      0.0 MiB       return (error,)
+
+
+(1501006682.0,)
+[ Top Diffs since Start ]
+top_diffs i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:0: size=473 KiB (+473 KiB), count=1581 (+1581), average=306 B
+top_diffs i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:0: size=303 KiB (+303 KiB), count=2246 (+2246), average=138 B
+top_diffs i: 3 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/basic.py:0: size=249 KiB (+249 KiB), count=1420 (+1420), average=179 B
+top_diffs i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:0: size=217 KiB (+217 KiB), count=1557 (+1557), average=143 B
+top_diffs i: 5 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/tracemalloc.py:0: size=208 KiB (+208 KiB), count=2821 (+2821), average=75 B
+top_diffs i: 6 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:0: size=202 KiB (+202 KiB), count=517 (+517), average=399 B
+top_diffs i: 7 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/finite_differences/tools.py:0: size=188 KiB (+188 KiB), count=2419 (+2419), average=80 B
+top_diffs i: 8 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:0: size=140 KiB (+140 KiB), count=249 (+249), average=577 B
+top_diffs i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:0: size=140 KiB (+140 KiB), count=1771 (+1771), average=81 B
+top_diffs i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/printing/printer.py:0: size=106 KiB (+106 KiB), count=898 (+898), average=121 B
+[ Top Incremental ]
+top_incremental i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:143: size=466 KiB (+466 KiB), count=1538 (+1538), average=311 B
+top_incremental i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:372: size=216 KiB (+216 KiB), count=1543 (+1543), average=143 B
+top_incremental i: 3 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:466: size=140 KiB (+140 KiB), count=439 (+439), average=327 B
+top_incremental i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:497: size=138 KiB (+138 KiB), count=223 (+223), average=635 B
+top_incremental i: 5 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:694: size=111 KiB (+111 KiB), count=1421 (+1421), average=80 B
+top_incremental i: 6 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/data/decomposition.py:62: size=93.0 KiB (+93.0 KiB), count=77 (+77), average=1237 B
+top_incremental i: 7 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/basic.py:1016: size=76.7 KiB (+76.7 KiB), count=433 (+433), average=181 B
+top_incremental i: 8 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/basic.py:376: size=75.4 KiB (+75.4 KiB), count=203 (+203), average=381 B
+top_incremental i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:742: size=72.0 KiB (+72.0 KiB), count=1 (+1), average=72.0 KiB
+top_incremental i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:738: size=72.0 KiB (+72.0 KiB), count=1 (+1), average=72.0 KiB
+[ Top Current]
+top_current i: 1 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py:0: size=473 KiB, count=1581, average=306 B
+top_current i: 2 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/collections/__init__.py:0: size=303 KiB, count=2246, average=138 B
+top_current i: 3 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/types/basic.py:0: size=249 KiB, count=1420, average=179 B
+top_current i: 4 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/posixpath.py:0: size=217 KiB, count=1557, average=143 B
+top_current i: 5 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/tracemalloc.py:0: size=208 KiB, count=2821, average=75 B
+top_current i: 6 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/inspect.py:0: size=202 KiB, count=517, average=399 B
+top_current i: 7 /home/oscar/Área de Trabalho/devito_mycontributions/devito/devito/finite_differences/tools.py:0: size=188 KiB, count=2419, average=80 B
+top_current i: 8 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/core/facts.py:0: size=140 KiB, count=249, average=577 B
+top_current i: 9 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/memory_profiler.py:0: size=140 KiB, count=1771, average=81 B
+top_current i: 10 /home/oscar/anaconda2/envs/devito_newest/lib/python3.7/site-packages/sympy/printing/printer.py:0: size=106 KiB, count=898, average=121 B
+traceback memory_blocks: 1538 size_kB: 466.427734375
+  File "/home/oscar/anaconda2/envs/devito_newest/lib/python3.7/abc.py", line 143
+    return _abc_subclasscheck(cls, subclass)
+Fitness computation took 1448.5204000473022
+mprof: Sampling memory every 0.1s
+running as a Python program...
