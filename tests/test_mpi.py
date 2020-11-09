@@ -5,10 +5,11 @@ from cached_property import cached_property
 from conftest import skipif
 from devito import (Grid, Constant, Function, TimeFunction, SparseFunction,
                     SparseTimeFunction, Dimension, ConditionalDimension, SubDimension,
-                    SubDomain, Eq, Inc, NODE, Operator, norm, inner, configuration,
+                    SubDomain, Eq, Ne, Inc, NODE, Operator, norm, inner, configuration,
                     switchconfig, generic_derivative)
 from devito.data import LEFT, RIGHT
-from devito.ir.iet import Call, Conditional, Iteration, FindNodes, retrieve_iteration_tree
+from devito.ir.iet import (Call, Conditional, Iteration, FindNodes, FindSymbols,
+                           retrieve_iteration_tree)
 from devito.mpi import MPI
 from examples.seismic.acoustic import acoustic_setup
 
@@ -28,6 +29,7 @@ class TestDistributor(object):
             4: [(8, 8), (8, 7), (7, 8), (7, 7)]
         }
         assert f.shape == expected[distributor.nprocs][distributor.myrank]
+        assert f.size_global == 225
 
     @pytest.mark.parallel(mode=[2, 4])
     def test_partitioning_fewer_dims(self):
@@ -319,20 +321,22 @@ class TestFunction(object):
 class TestSparseFunction(object):
 
     @pytest.mark.parallel(mode=4)
-    @pytest.mark.parametrize('coords', [
-        ((1., 1.), (1., 3.), (3., 1.), (3., 3.)),
+    @pytest.mark.parametrize('shape, coords, points', [
+        ((4, 4), ((1., 1.), (1., 3.), (3., 1.), (3., 3.)), 1),
+        ((8, ), ((1.,), (3.,), (5.,), (7.,)), 1),
+        ((8, ), ((1.,), (2.,), (3.,), (4.,), (5.,), (6.,), (7.,), (8.,)), 2)
     ])
-    def test_ownership(self, coords):
+    def test_ownership(self, shape, coords, points):
         """Given a sparse point ``p`` with known coordinates, this test checks
         that the MPI rank owning ``p`` is retrieved correctly."""
-        grid = Grid(shape=(4, 4), extent=(4.0, 4.0))
+        grid = Grid(shape=shape, extent=shape)
 
-        sf = SparseFunction(name='sf', grid=grid, npoint=4, coordinates=coords)
+        sf = SparseFunction(name='sf', grid=grid, npoint=len(coords), coordinates=coords)
 
         # The domain decomposition is so that the i-th MPI rank gets exactly one
         # sparse point `p` and, incidentally, `p` is logically owned by `i`
-        assert len(sf.gridpoints) == 1
-        assert all(grid.distributor.glb_to_rank(i) == grid.distributor.myrank
+        assert len(sf.gridpoints) == points
+        assert all(grid.distributor.glb_to_rank(i)[0] == grid.distributor.myrank
                    for i in sf.gridpoints)
 
     @pytest.mark.parallel(mode=4)
@@ -736,6 +740,25 @@ class TestCodeGeneration(object):
         assert len(calls) == 0
 
     @pytest.mark.parallel(mode=1)
+    def test_do_haloupdate_with_constant_locindex(self):
+        """
+        Like `test_avoid_haloupdate_with_constant_index`, there is again
+        a constant index, but this time along a loc-index (`t` Dimension),
+        which needs to be handled by the `compute_loc_indices` function.
+        The actual halo update is induced by u.dx.
+        """
+        grid = Grid(shape=(4,))
+        x = grid.dimensions[0]
+
+        u = TimeFunction(name='u', grid=grid)
+
+        eq = Eq(u.forward, u[0, x] + u.dx)
+        op = Operator(eq)
+
+        calls = FindNodes(Call).visit(op)
+        assert len(calls) == 1
+
+    @pytest.mark.parallel(mode=1)
     def test_hoist_haloupdate_if_no_flowdep(self):
         grid = Grid(shape=(12,))
         x = grid.dimensions[0]
@@ -925,6 +948,40 @@ class TestCodeGeneration(object):
             assert np.allclose(g.data_ro_domain[0, 5:], [4.8, 4.8, 4.8, 4.8, 2.], rtol=R)
 
     @pytest.mark.parallel(mode=2)
+    def test_unmerge_haloupdate_if_no_locindices(self):
+        grid = Grid(shape=(10,))
+        x = grid.dimensions[0]
+        t = grid.stepping_dim
+
+        f = Function(name='f', grid=grid, space_order=1)
+        g = TimeFunction(name='g', grid=grid, space_order=1, time_order=1)
+
+        f.data_with_halo[:] = 0.
+        g.data_with_halo[:] = 1.
+
+        eqns = [Eq(f, g[t, x+1] + g[t, x-1]),
+                Eq(g.forward, f[x-1] + f[x+1])]
+
+        op = Operator(eqns)
+
+        calls = FindNodes(Call).visit(op)
+        assert len(calls) == 2
+
+        assert op.body[-1].body[0].nodes[0].body[0].body[0].body[0].is_Call
+        assert not op.body[-1].body[0].nodes[0].body[0].body[0].body[1].is_Call
+
+        op.apply(time_M=1)
+
+        glb_pos_map = f.grid.distributor.glb_pos_map
+        R = 1e-07  # Can't use np.all due to rounding error at the tails
+        if LEFT in glb_pos_map[x]:
+            assert np.allclose(f.data_ro_domain[:5], [5., 6., 8., 8., 8.], rtol=R)
+            assert np.allclose(g.data_ro_domain[0, :5], [6., 13., 14., 16., 16.], rtol=R)
+        else:
+            assert np.allclose(f.data_ro_domain[5:], [8., 8., 8., 6., 5.], rtol=R)
+            assert np.allclose(g.data_ro_domain[0, 5:], [16., 16., 14., 13., 6.], rtol=R)
+
+    @pytest.mark.parallel(mode=2)
     def test_unmerge_haloudate_if_diff_locindices(self):
         """
         In the Operator there are three Eqs:
@@ -973,6 +1030,30 @@ class TestCodeGeneration(object):
         else:
             assert np.allclose(g.data_ro_domain[0, 5:], [6.4, 6.4, 6.4, 6.4, 4.4], rtol=R)
             assert np.allclose(h.data_ro_domain[0, 5:], [4.4, 4.4, 4.4, 3.4, 3.1], rtol=R)
+
+    @pytest.mark.parallel(mode=1)
+    def test_conditional_dimension(self):
+        """
+        Test the case of Functions in the condition of a ConditionalDimension.
+        """
+        grid = Grid(shape=(4, 4))
+        x, y = grid.dimensions
+        t = grid.stepping_dim
+
+        f = TimeFunction(name='f', grid=grid)
+        g = Function(name='g', grid=grid)
+        h = TimeFunction(name='h', grid=grid, space_order=2)
+
+        cd = ConditionalDimension(name='cd', parent=x, condition=~Ne(g, h[t, x+1, y]))
+
+        eqns = [Eq(f.forward, f + 1, implicit_dims=cd),
+                Eq(g, h + 1)]
+
+        op = Operator(eqns)
+
+        # No halo update here because the `x` Iteration is SEQUENTIAL
+        calls = FindNodes(Call).visit(op)
+        assert len(calls) == 0
 
     @pytest.mark.parametrize('expr,expected', [
         ('f[t,x-1,y] + f[t,x+1,y]', {'rc', 'lc'}),
@@ -1580,7 +1661,7 @@ class TestOperatorAdvanced(object):
         assert (np.isclose(norm(f), 17.24904, atol=1e-4, rtol=0))
 
     @pytest.mark.parallel(mode=[(4, 'basic'), (4, 'overlap2', True)])
-    def test_aliases(self):
+    def test_cire(self):
         """
         Check correctness when the DSE extracts aliases and places them
         into offset-ed loop (nest). For example, the compiler may generate:
@@ -1619,9 +1700,9 @@ class TestOperatorAdvanced(object):
         assert u0_norm == u1_norm
 
     @pytest.mark.parallel(mode=[(4, 'overlap2', True)])
-    def test_aliases_with_shifted_diagonal_halo_touch(self):
+    def test_cire_with_shifted_diagonal_halo_touch(self):
         """
-        Like ``test_aliases`` but now the diagonal halos required to compute
+        Like ``test_cire`` but now the diagonal halos required to compute
         the aliases are shifted due to the iteration space. Basically, this
         is checking that ``TimedAccess.touched_halo`` does the right thing
         using the information stored in ``.intervals``.
@@ -1648,6 +1729,37 @@ class TestOperatorAdvanced(object):
         u1_norm = norm(u)
 
         assert u0_norm == u1_norm
+
+    @pytest.mark.parallel(mode=4)
+    def test_cire_w_rotations(self):
+        """
+        MFE for issue #1490.
+        """
+        grid = Grid(shape=(128, 128, 128), dtype=np.float64)
+
+        p = TimeFunction(name='p', grid=grid, time_order=2, space_order=8)
+        p1 = TimeFunction(name='p', grid=grid, time_order=2, space_order=8)
+
+        p.data[0, 40:80, 40:80, 40:80] = 0.12
+        p1.data[0, 40:80, 40:80, 40:80] = 0.12
+
+        eqn = Eq(p.forward, (p.dx).dx + (p.dy).dy + (p.dz).dz)
+
+        op0 = Operator(eqn, opt='noop')
+        op1 = Operator(eqn, opt=('advanced', {'cire-repeats-sops': 9,
+                                              'cire-rotate': True}))
+
+        # Check generated code
+        arrays = [i for i in FindSymbols().visit(op1._func_table['bf0']) if i.is_Array]
+        assert len(arrays) == 3
+        assert 'haloupdate_0' in op1._func_table
+
+        op0.apply(time_M=1)
+        op1.apply(time_M=1, p=p1)
+
+        # TODO: we can tighthen the tolerance, or switch to single precision,
+        # once issue #1438 is fixed
+        assert np.allclose(p.data, p1.data, rtol=10e-11)
 
     @pytest.mark.parallel(mode=[(4, 'full', True)])
     def test_staggering(self):
