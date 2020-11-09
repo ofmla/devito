@@ -8,8 +8,7 @@ from examples.seismic.tti import AnisotropicWaveSolver
 
 
 def tti_setup(shape=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=250.0,
-              kernel='centered', space_order=4, nbl=10, preset='layers-tti',
-              **kwargs):
+              space_order=4, nbl=10, preset='layers-tti', **kwargs):
 
     # Two layer model for true velocity
     model = demo_model(preset, shape=shape, spacing=spacing,
@@ -18,7 +17,7 @@ def tti_setup(shape=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=250.0,
     # Source and receiver geometries
     geometry = setup_geometry(model, tn)
 
-    return AnisotropicWaveSolver(model, geometry, space_order=space_order, **kwargs)
+    return AnisotropicWaveSolver(model, geometry, space_order=space_order)
 
 
 def run(shape=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=250.0,
@@ -26,7 +25,7 @@ def run(shape=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=250.0,
         kernel='centered', full_run=False, **kwargs):
 
     solver = tti_setup(shape=shape, spacing=spacing, tn=tn, space_order=space_order,
-                       nbl=nbl, kernel=kernel, **kwargs)
+                       nbl=nbl, **kwargs)
     info("Applying Forward")
 
     rec, u, v, summary = solver.forward(autotune=autotune, kernel=kernel)
@@ -69,5 +68,5 @@ if __name__ == "__main__":
     tn = args.tn if args.tn > 0 else (750. if ndim < 3 else 1250.)
 
     run(shape=shape, spacing=spacing, nbl=args.nbl, tn=tn,
-        space_order=args.space_order, autotune=args.autotune, dtype=args.dtype,
+        space_order=args.space_order, autotune=args.autotune,
         opt=args.opt, kernel=args.kernel, preset=preset, full_run=args.full)

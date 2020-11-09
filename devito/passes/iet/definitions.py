@@ -13,7 +13,7 @@ from devito.ir import (List, LocalExpression, PointerCast, FindSymbols,
 from devito.passes.iet.engine import iet_pass
 from devito.passes.iet.openmp import Ompizer
 from devito.symbolics import ccode
-from devito.tools import as_mapper, as_tuple, flatten
+from devito.tools import as_mapper, flatten
 
 __all__ = ['DataManager', 'Storage']
 
@@ -186,45 +186,33 @@ class DataManager(object):
         """
         storage = Storage()
 
-        refmap = FindSymbols().visit(iet).mapper
-        placed = list(iet.parameters)
+        already_defined = list(iet.parameters)
 
         for k, v in MapExprStmts().visit(iet).items():
-            if k.is_LocalExpression:
-                placed.append(k.write)
-                objs = []
-            elif k.is_Expression:
+            if k.is_Expression:
                 if k.is_definition:
                     site = v[-1] if v else iet
                     self._alloc_scalar_on_low_lat_mem(site, k, storage)
                     continue
                 objs = [k.write]
             elif k.is_Dereference:
-                placed.append(k.array)
-                if k.parray in placed:
+                already_defined.append(k.array)
+                if k.parray in already_defined:
                     objs = []
                 else:
                     objs = [k.parray]
             elif k.is_Call:
-                objs = k.arguments + as_tuple(k.retobj)
+                objs = k.arguments
 
             for i in objs:
-                if i in placed:
+                if i in already_defined:
                     continue
 
                 try:
                     if i.is_LocalObject:
-                        # LocalObject's get placed as close as possible to
-                        # their first appearence
-                        site = iet
-                        for n in v:
-                            if i in refmap[n]:
-                                break
-                            site = n
+                        site = v[-1] if v else iet
                         self._alloc_object_on_low_lat_mem(site, i, storage)
                     elif i.is_Array:
-                        # Array's get placed as far as possible from their
-                        # first appearence
                         site = iet
                         if i._mem_local:
                             # If inside a ParallelRegion, make sure we allocate
@@ -238,7 +226,6 @@ class DataManager(object):
                         else:
                             self._alloc_array_on_low_lat_mem(site, i, storage)
                     elif i.is_PointerArray:
-                        # PointerArray's get placed at the top of the IET
                         self._alloc_pointed_array_on_high_bw_mem(iet, i, storage)
                 except AttributeError:
                     # E.g., a generic SymPy expression

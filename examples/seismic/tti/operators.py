@@ -54,7 +54,6 @@ def trig_func(model):
 def Gzz_centered(model, field, costheta, sintheta, cosphi, sinphi, space_order):
     """
     3D rotated second order derivative in the direction z.
-
     Parameters
     ----------
     field : Function
@@ -69,7 +68,6 @@ def Gzz_centered(model, field, costheta, sintheta, cosphi, sinphi, space_order):
         Sine of the azymuth angle.
     space_order : int
         Space discretization order.
-
     Returns
     -------
     Rotated second order derivative w.r.t. z.
@@ -93,7 +91,6 @@ def Gzz_centered(model, field, costheta, sintheta, cosphi, sinphi, space_order):
 def Gzz_centered_2d(model, field, costheta, sintheta, space_order):
     """
     2D rotated second order derivative in the direction z.
-
     Parameters
     ----------
     field : Function
@@ -104,7 +101,6 @@ def Gzz_centered_2d(model, field, costheta, sintheta, space_order):
         Sine of the tilt angle.
     space_order : int
         Space discretization order.
-
     Returns
     -------
     Rotated second order derivative w.r.t. z.
@@ -124,7 +120,6 @@ def Gxxyy_centered(model, field, costheta, sintheta, cosphi, sinphi, space_order
     As the Laplacian is rotation invariant, it is computed as the conventional
     Laplacian minus the second order rotated second order derivative in the direction z
     Gxx + Gyy = field.laplace - Gzz
-
     Parameters
     ----------
     field : Function
@@ -139,7 +134,6 @@ def Gxxyy_centered(model, field, costheta, sintheta, cosphi, sinphi, space_order
         Sine of the azymuth angle.
     space_order : int
         Space discretization order.
-
     Returns
     -------
     Sum of the 3D rotated second order derivative in the direction x and y.
@@ -154,7 +148,6 @@ def Gxx_centered_2d(model, field, costheta, sintheta, space_order):
     As the Laplacian is rotation invariant, it is computed as the conventional
     Laplacian minus the second order rotated second order derivative in the direction z
     Gxx = field.laplace - Gzz
-
     Parameters
     ----------
     field : TimeFunction
@@ -169,7 +162,6 @@ def Gxx_centered_2d(model, field, costheta, sintheta, space_order):
         Sine of the azymuth angle.
     space_order : int
         Space discretization order.
-
     Returns
     -------
     Sum of the 3D rotated second order derivative in the direction x.
@@ -196,13 +188,14 @@ def kernel_centered_2d(model, u, v, space_order, forward=True):
     for the forward and adjoint cases, respectively. Epsilon and delta are the Thomsen
     parameters. This function computes H0 and Hz.
 
-    References:
-        * Zhang, Yu, Houzhu Zhang, and Guanquan Zhang. "A stable TTI reverse
-          time migration and its implementation." Geophysics 76.3 (2011): WA3-WA11.
-        * Louboutin, Mathias, Philipp Witte, and Felix J. Herrmann. "Effects of
-          wrong adjoints for RTM in TTI media." SEG Technical Program Expanded
-          Abstracts 2018. Society of Exploration Geophysicists, 2018. 331-335.
+    References
+    ----------
+    Zhang, Yu, Houzhu Zhang, and Guanquan Zhang. "A stable TTI reverse time migration and
+    its implementation." Geophysics 76.3 (2011): WA3-WA11.
 
+    Louboutin, Mathias, Philipp Witte, and Felix J. Herrmann. "Effects of wrong adjoints
+    for RTM in TTI media." SEG Technical Program Expanded Abstracts 2018. Society of
+    Exploration Geophysicists, 2018. 331-335.
     Parameters
     ----------
     u : TimeFunction
@@ -211,7 +204,6 @@ def kernel_centered_2d(model, u, v, space_order, forward=True):
         Second TTI field.
     space_order : int
         Space discretization order.
-
     Returns
     -------
     u and v component of the rotated Laplacian in 2D.
@@ -255,13 +247,14 @@ def kernel_centered_3d(model, u, v, space_order, forward=True):
     for the forward and adjoint cases, respectively. Epsilon and delta are the Thomsen
     parameters. This function computes H0 and Hz.
 
-    References:
-        * Zhang, Yu, Houzhu Zhang, and Guanquan Zhang. "A stable TTI reverse
-          time migration and its implementation." Geophysics 76.3 (2011): WA3-WA11.
-        * Louboutin, Mathias, Philipp Witte, and Felix J. Herrmann. "Effects of
-          wrong adjoints for RTM in TTI media." SEG Technical Program Expanded
-          Abstracts 2018. Society of Exploration Geophysicists, 2018. 331-335.
+    References
+    ----------
+    Zhang, Yu, Houzhu Zhang, and Guanquan Zhang. "A stable TTI reverse time migration and
+    its implementation." Geophysics 76.3 (2011): WA3-WA11.
 
+    Louboutin, Mathias, Philipp Witte, and Felix J. Herrmann. "Effects of wrong adjoints
+    for RTM in TTI media." SEG Technical Program Expanded Abstracts 2018. Society of
+    Exploration Geophysicists, 2018. 331-335.
     Parameters
     ----------
     u : TimeFunction
@@ -270,7 +263,6 @@ def kernel_centered_3d(model, u, v, space_order, forward=True):
         Second TTI field.
     space_order : int
         Space discretization order.
-
     Returns
     -------
     u and v component of the rotated Laplacian in 3D.
@@ -330,7 +322,6 @@ def particle_velocity_fields(model, space_order):
 def kernel_staggered_2d(model, u, v, space_order):
     """
     TTI finite difference. The equation solved is:
-
     vx.dt = - u.dx
     vz.dt = - v.dx
     m * v.dt = - sqrt(1 + 2 delta) vx.dx - vz.dz + Fh
@@ -367,7 +358,6 @@ def kernel_staggered_2d(model, u, v, space_order):
 def kernel_staggered_3d(model, u, v, space_order):
     """
     TTI finite difference. The equation solved is:
-
     vx.dt = - u.dx
     vy.dt = - u.dx
     vz.dt = - v.dx
@@ -417,7 +407,6 @@ def ForwardOperator(model, geometry, space_order=4,
                     save=False, kernel='centered', **kwargs):
     """
     Construct an forward modelling operator in an tti media.
-
     Parameters
     ----------
     model : Model
@@ -471,7 +460,6 @@ def AdjointOperator(model, geometry, space_order=4,
                     **kwargs):
     """
     Construct an adjoint modelling operator in an tti media.
-
     Parameters
     ----------
     model : Model

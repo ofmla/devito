@@ -90,8 +90,6 @@ def sniff_mpi_distro(mpiexec):
             return 'OpenMPI'
         elif "HYDRA" in ver:
             return 'MPICH'
-        elif "Intel(R) MPI" in ver:
-            return 'IntelMPI'
     except (CalledProcessError, UnicodeDecodeError):
         pass
     return 'unknown'
@@ -399,7 +397,7 @@ class ClangCompiler(Compiler):
             if language in ['C', 'openmp']:
                 self.ldflags += ['-target', 'x86_64-pc-linux-gnu']
                 self.ldflags += ['-fopenmp',
-                                 '-fopenmp-targets=amdgcn-amd-amdhsa',
+                                 '-fopenmp-targets=amdgcn-amd-amdhs',
                                  '-Xopenmp-target=amdgcn-amd-amdhsa']
                 self.ldflags += ['-march=%s' % platform.march]
         else:
@@ -452,7 +450,7 @@ class PGICompiler(Compiler):
         self.cflags.remove('-std=c99')
         self.cflags.remove('-O3')
         self.cflags.remove('-Wall')
-        self.cflags += ['-std=c++11', '-fast', '-acc', '-mp']
+        self.cflags += ['-fast', '-acc']
         # Default PGI compile for a target is GPU and single threaded host.
         # self.cflags += ['-ta=tesla,host']
 
@@ -460,15 +458,6 @@ class PGICompiler(Compiler):
         # NOTE: using `pgc++` instead of `pgcc` because of issue #1219
         self.CC = 'pgc++'
         self.CXX = 'pgc++'
-        self.MPICC = 'mpic++'
-        self.MPICXX = 'mpicxx'
-
-
-class NvidiaCompiler(PGICompiler):
-
-    def __lookup_cmds__(self):
-        self.CC = 'nvc++'
-        self.CXX = 'nvc++'
         self.MPICC = 'mpic++'
         self.MPICXX = 'mpicxx'
 
@@ -587,9 +576,6 @@ compiler_registry = {
     'aomp': AOMPCompiler,
     'pgcc': PGICompiler,
     'pgi': PGICompiler,
-    'nvc': NvidiaCompiler,
-    'nvcc': NvidiaCompiler,
-    'nvidia': NvidiaCompiler,
     'osx': ClangCompiler,
     'intel': IntelCompiler,
     'icpc': IntelCompiler,

@@ -166,11 +166,6 @@ class Grid(ArgProvider):
         return self._origin
 
     @property
-    def origin_map(self):
-        """Map between origin symbols and their values"""
-        return {o: o.data for o in self.origin}
-
-    @property
     def dimensions(self):
         """Spatial dimensions of the computational domain."""
         return self._dimensions

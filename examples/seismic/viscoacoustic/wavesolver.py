@@ -1,5 +1,6 @@
 from devito import VectorTimeFunction, TimeFunction, NODE
 from devito.tools import memoized_meth
+from examples.seismic import Receiver
 from examples.seismic.viscoacoustic.operators import ForwardOperator
 
 
@@ -27,7 +28,6 @@ class ViscoacousticWaveSolver(object):
     """
     def __init__(self, model, geometry, space_order=4, kernel='blanch_symes', **kwargs):
         self.model = model
-        self.model._initialize_bcs(bcs="mask")
         self.geometry = geometry
 
         self.space_order = space_order
@@ -69,8 +69,8 @@ class ViscoacousticWaveSolver(object):
             The time-constant inverse density.
         vp : Function or float, optional
             The time-constant velocity.
-        save : bool, optional
-            Whether or not to save the entire (unrolled) wavefield.
+        save : int or Buffer, optional
+            Option to store the entire (unrolled) wavefield.
 
         Returns
         -------
@@ -80,7 +80,9 @@ class ViscoacousticWaveSolver(object):
         src = src or self.geometry.src
 
         # Create a new receiver object to store the result
-        rec = rec or self.geometry.rec
+        rec = rec or Receiver(name="rec", grid=self.model.grid,
+                              time_range=self.geometry.time_axis,
+                              coordinates=self.geometry.rec_positions)
 
         # Create all the fields v, p, r
         save_t = src.nt if save else None

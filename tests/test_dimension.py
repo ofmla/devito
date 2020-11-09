@@ -7,41 +7,10 @@ import pytest
 from conftest import skipif
 from devito import (ConditionalDimension, Grid, Function, TimeFunction, SparseFunction,  # noqa
                     Eq, Operator, Constant, Dimension, SubDimension, switchconfig,
-                    SubDomain, Lt, Le, Gt, Ge, Ne, Buffer)
+                    SubDomain, Lt, Le, Gt, Ge, Ne)
 from devito.ir.iet import Expression, Iteration, FindNodes, retrieve_iteration_tree
 from devito.symbolics import indexify, retrieve_functions
 from devito.types import Array
-
-
-class TestBufferedDimension(object):
-
-    def test_multi_buffer(self):
-        grid = Grid((3, 3))
-        f = TimeFunction(name="f", grid=grid)
-        g = TimeFunction(name="g", grid=grid, save=Buffer(7))
-
-        op = Operator([Eq(f.forward, 1), Eq(g, f.forward)])
-        op(time_M=3)
-        # f looped all time_order buffer and is 1 everywhere
-        assert np.allclose(f.data, 1)
-        # g looped indices 0 to 3, rest is still 0
-        assert np.allclose(g.data[0:4], 1)
-        assert np.allclose(g.data[4:], 0)
-
-    def test_multi_buffer_long_time(self):
-        grid = Grid((3, 3))
-        time = grid.time_dim
-        f = TimeFunction(name="f", grid=grid)
-        g = TimeFunction(name="g", grid=grid, save=Buffer(7))
-
-        op = Operator([Eq(f.forward, time), Eq(g, time+1)])
-        op(time_M=20)
-        # f[0] is time=19, f[1] is time=20
-        assert np.allclose(f.data[0], 19)
-        assert np.allclose(f.data[1], 20)
-        # g is time 15 to 21 (loop twice the 7 buffer then 15->21)
-        for i in range(7):
-            assert np.allclose(g.data[i], 14+i+1)
 
 
 class TestSubDimension(object):
@@ -931,13 +900,12 @@ class TestConditionalDimension(object):
         inner_domain = InnerDomain()
         grid = Grid(shape=(8, 8), subdomains=(inner_domain,))
         g = Function(name='g', grid=grid)
-        g2 = Function(name='g2', grid=grid)
+        g2 = Function(name='g', grid=grid)
 
-        for i in [g, g2]:
-            i.data[:4, :4] = 1
-            i.data[4:, :4] = 2
-            i.data[4:, 4:] = 3
-            i.data[:4, 4:] = 4
+        g.data[:4, :4] = 1
+        g.data[4:, :4] = 2
+        g.data[4:, 4:] = 3
+        g.data[:4, 4:] = 4
 
         xi, yi = grid.subdomains['inner'].dimensions
 
@@ -951,24 +919,6 @@ class TestConditionalDimension(object):
         Operator([eq1, eq2]).apply()
         assert np.all(f.data[2:6, c1:c2] == 5.)
         assert np.all(f.data[:, c3:c4] < 5.)
-
-    def test_from_cond_to_param(self):
-        """
-        Test that Functions appearing in the condition of a ConditionalDimension
-        but not explicitly in an Eq are actually part of the Operator input
-        (stems from issue #1298).
-        """
-        grid = Grid(shape=(8, 8))
-        x, y = grid.dimensions
-
-        g = Function(name='g', grid=grid)
-        h = Function(name='h', grid=grid)
-        ci = ConditionalDimension(name='ci', parent=y, condition=Lt(g, 2 + h))
-        f = Function(name='f', shape=grid.shape, dimensions=(x, ci))
-
-        for _ in range(5):
-            # issue #1298 was non deterministic
-            Operator(Eq(f, 5)).apply()
 
     @skipif('device')
     def test_no_fusion_simple(self):
@@ -1041,7 +991,7 @@ class TestConditionalDimension(object):
         assert exprs[2].expr.rhs is exprs[0].output
 
         exprs = FindNodes(Expression).visit(op._func_table['bf1'].root)
-        assert len(exprs) == 3
+        assert len(exprs) == 2
 
         exprs = FindNodes(Expression).visit(op._func_table['bf2'].root)
         assert len(exprs) == 3

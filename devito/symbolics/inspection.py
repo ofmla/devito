@@ -2,8 +2,7 @@ from collections import Counter
 
 from sympy import cos, sin, exp, log
 
-from devito.symbolics.queries import q_routine
-from devito.symbolics.search import retrieve_terminals, retrieve_xops, search
+from devito.symbolics.search import retrieve_xops, search
 from devito.logger import warning
 from devito.tools import as_tuple, flatten
 
@@ -67,17 +66,15 @@ def estimate_cost(exprs, estimate=False):
     """
     Estimate the operation count of an expression.
 
+
     Parameters
     ----------
     exprs : expr-like or list of expr-like
         One or more expressions for which the operation count is calculated.
     estimate : bool, optional
-        Defaults to False; if True, the following rules are applied in order:
-            * An operation involving only `Constant`'s counts as 1 ops.
+        Defaults to False; if True, the following rules are applied:
             * Trascendental functions (e.g., cos, sin, ...) count as 50 ops.
-            * Divisions (powers with a negative exponent) count as 25 ops.
-            * Powers with integer exponent `n>0` count as n-1 ops (as if
-              it were a chain of multiplications).
+            * Divisions (powers with a negative exponened) count as 25 ops.
     """
     trascendentals_cost = {sin: 50, cos: 50, exp: 50, log: 50}
     pow_cost = 50
@@ -108,20 +105,13 @@ def estimate_cost(exprs, estimate=False):
         flops = 0
         for op in operations:
             if op.is_Function:
-                if estimate and q_routine(op):
-                    terminals = retrieve_terminals(op, deep=True)
-                    if all(i.function.is_const for i in terminals):
-                        flops += 1
-                    else:
-                        flops += trascendentals_cost.get(op.__class__, 1)
+                if estimate:
+                    flops += trascendentals_cost.get(op.__class__, 1)
                 else:
                     flops += 1
             elif op.is_Pow:
                 if estimate:
-                    terminals = retrieve_terminals(op, deep=True)
-                    if all(i.function.is_const for i in terminals):
-                        flops += 1
-                    elif op.exp.is_Number:
+                    if op.exp.is_Number:
                         if op.exp < 0:
                             flops += div_cost
                         elif op.exp == 0:

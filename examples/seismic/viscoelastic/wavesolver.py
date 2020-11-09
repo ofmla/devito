@@ -1,5 +1,6 @@
 from devito import VectorTimeFunction, TensorTimeFunction
 from devito.tools import memoized_meth
+from examples.seismic import Receiver
 from examples.seismic.viscoelastic.operators import ForwardOperator
 
 
@@ -25,7 +26,6 @@ class ViscoelasticWaveSolver(object):
     """
     def __init__(self, model, geometry, space_order=4, **kwargs):
         self.model = model
-        self.model._initialize_bcs(bcs="mask")
         self.geometry = geometry
 
         self.space_order = space_order
@@ -75,8 +75,8 @@ class ViscoelasticWaveSolver(object):
             The S-wave quality factor (dimensionless).
         b : Function, optional
             The time-constant inverse density (1/rho=1 for water).
-        save : bool, optional
-            Whether or not to save the entire (unrolled) wavefield.
+        save : int or Buffer, optional
+            Option to store the entire (unrolled) wavefield.
 
         Returns
         -------
@@ -86,19 +86,23 @@ class ViscoelasticWaveSolver(object):
         # Source term is read-only, so re-use the default
         src = src or self.geometry.src
         # Create a new receiver object to store the result
-        rec1 = rec1 or self.geometry.new_rec(name='rec1')
-        rec2 = rec2 or self.geometry.new_rec(name='rec2')
+        rec1 = rec1 or Receiver(name='rec1', grid=self.model.grid,
+                                time_range=self.geometry.time_axis,
+                                coordinates=self.geometry.rec_positions)
+        rec2 = rec2 or Receiver(name='rec2', grid=self.model.grid,
+                                time_range=self.geometry.time_axis,
+                                coordinates=self.geometry.rec_positions)
 
         # Create all the fields v, tau, r
         save_t = src.nt if save else None
-        v = v or VectorTimeFunction(name="v", grid=self.model.grid, save=save_t,
-                                    time_order=1, space_order=self.space_order)
+        v = VectorTimeFunction(name="v", grid=self.model.grid, save=save_t,
+                               time_order=1, space_order=self.space_order)
         # Stress:
-        tau = tau or TensorTimeFunction(name='t', grid=self.model.grid, save=save_t,
-                                        space_order=self.space_order, time_order=1)
+        tau = TensorTimeFunction(name='t', grid=self.model.grid, save=save_t,
+                                 space_order=self.space_order, time_order=1)
         # Memory variable:
-        r = r or TensorTimeFunction(name='r', grid=self.model.grid, save=save_t,
-                                    space_order=self.space_order, time_order=1)
+        r = TensorTimeFunction(name='r', grid=self.model.grid, save=save_t,
+                               space_order=self.space_order, time_order=1)
 
         kwargs.update({k.name: k for k in v})
         kwargs.update({k.name: k for k in tau})

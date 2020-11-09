@@ -304,14 +304,14 @@ class Distributor(AbstractDistributor):
             The index, or list of indices, for which the owning MPI rank(s) is
             retrieved.
         """
-        assert isinstance(index, (tuple, list))
-        if len(index) == 0:
-            return None
-        elif is_integer(index[0]):
-            # `index` is a single point
-            indices = [index]
-        else:
-            indices = index
+        if isinstance(index, (tuple, list)):
+            if len(index) == 0:
+                return None
+            elif is_integer(index[0]):
+                # `index` is a single point
+                indices = [index]
+            else:
+                indices = index
         ret = []
         for i in indices:
             assert len(i) == self.ndim
@@ -322,7 +322,7 @@ class Distributor(AbstractDistributor):
                     found = True
                     break
             assert found
-        return as_tuple(ret)
+        return tuple(ret) if len(indices) > 1 else ret[0]
 
     @property
     def neighborhood(self):

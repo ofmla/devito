@@ -1,13 +1,12 @@
 from cached_property import cached_property
 import sympy
 
-from devito.ir.equations.algorithms import dimension_sort, lower_exprs
+from devito.ir.equations.algorithms import dimension_sort
 from devito.finite_differences.differentiable import diff2sympy
 from devito.ir.support import (IterationSpace, DataSpace, Interval, IntervalGroup,
                                Stencil, detect_accesses, detect_oobs, detect_io,
                                build_intervals, build_iterators)
-from devito.symbolics import CondEq
-from devito.tools import Pickable, frozendict
+from devito.tools import Pickable, as_tuple
 from devito.types import Eq
 
 __all__ = ['LoweredEq', 'ClusterizedEq', 'DummyEq']
@@ -54,9 +53,9 @@ class IREq(object):
     def implicit_dims(self):
         return self._implicit_dims
 
-    @cached_property
+    @property
     def conditionals(self):
-        return self._conditionals or frozendict()
+        return as_tuple(self._conditionals)
 
     @property
     def directions(self):
@@ -66,17 +65,9 @@ class IREq(object):
     def dtype(self):
         return self.lhs.dtype
 
-    @cached_property
+    @property
     def grid(self):
-        grids = set()
-        for f in self.dspace.parts:
-            if f.is_DiscreteFunction:
-                grids.add(f.grid)
-
-        if len(grids) == 1:
-            return grids.pop()
-        else:
-            return None
+        return self.lhs.function.grid if self.is_Tensor else None
 
     @property
     def state(self):
@@ -131,7 +122,7 @@ class LoweredEq(sympy.Eq, IREq):
         # Analyze the expression
         mapper = detect_accesses(expr)
         oobs = detect_oobs(mapper)
-        conditional_dimensions = [i for i in ordering if i.is_Conditional]
+        conditionals = [i for i in ordering if i.is_Conditional]
 
         # Construct Intervals for IterationSpace and DataSpace
         intervals = build_intervals(Stencil.union(*mapper.values()))
@@ -153,19 +144,10 @@ class LoweredEq(sympy.Eq, IREq):
 
         # Construct the DataSpace
         dintervals.extend([Interval(i, 0, 0) for i in ordering
-                           if i not in ispace.dimensions + conditional_dimensions])
+                           if i not in ispace.dimensions + conditionals])
         parts = {k: IntervalGroup(build_intervals(v)).add(iintervals)
                  for k, v in mapper.items() if k}
         dspace = DataSpace(dintervals, parts)
-
-        # Construct the conditionals
-        conditionals = {}
-        for d in conditional_dimensions:
-            if d.condition is None:
-                conditionals[d] = CondEq(d.parent % d.factor, 0)
-            else:
-                conditionals[d] = diff2sympy(lower_exprs(d.condition))
-        conditionals = frozendict(conditionals)
 
         # Lower all Differentiable operations into SymPy operations
         rhs = diff2sympy(expr.rhs)
@@ -175,7 +157,7 @@ class LoweredEq(sympy.Eq, IREq):
 
         expr._dspace = dspace
         expr._ispace = ispace
-        expr._conditionals = conditionals
+        expr._conditionals = tuple(conditionals)
         expr._reads, expr._writes = detect_io(expr)
 
         expr._is_Increment = input_expr.is_Increment

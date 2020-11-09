@@ -621,8 +621,7 @@ if __name__ == "__main__":
         # MPI not available
         pass
 
-    # Benchmarking cannot be done at basic level
-    if configuration['profiling'] == 'basic':
-        configuration['profiling'] = 'advanced'
+    # Profiling at max level
+    configuration['profiling'] = 'advanced'
 
     benchmark()

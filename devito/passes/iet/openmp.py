@@ -4,7 +4,6 @@ import numpy as np
 import cgen as c
 from sympy import Or, Max, Not
 
-from devito.data import FULL
 from devito.ir import (DummyEq, Conditional, Dereference, Expression, ExpressionBundle,
                        List, Prodder, ParallelIteration, ParallelBlock, While,
                        FindSymbols, FindNodes, Return, COLLAPSED, VECTORIZED, Transformer,
@@ -136,22 +135,8 @@ class OpenMPIteration(ParallelIteration):
             clauses.append('num_threads(%s)' % nthreads)
 
         if reduction:
-            args = []
-            for i in reduction:
-                if i.is_Indexed:
-                    f = i.function
-                    bounds = []
-                    for k, d in zip(i.indices, f.dimensions):
-                        if k.is_Number:
-                            bounds.append('[%s]' % k)
-                        else:
-                            # OpenMP expects a range as input of reduction,
-                            # such as reduction(+:f[0:f_vec->size[1]])
-                            bounds.append('[0:%s]' % f._C_get_field(FULL, d).size)
-                    args.append('%s%s' % (i.name, ''.join(bounds)))
-                else:
-                    args.append(str(i))
-            clauses.append('reduction(+:%s)' % ','.join(args))
+            args = ','.join(str(i) for i in reduction)
+            clauses.append('reduction(+:%s)' % args)
 
         return clauses
 
@@ -329,7 +314,7 @@ class Ompizer(object):
         return c.Initializer(c.Value(tid._C_typedata, tid.name), cls.lang['thread-num'])
 
     def _make_reductions(self, partree, collapsed):
-        if not any(i.is_ParallelAtomic for i in collapsed):
+        if not partree.is_ParallelAtomic:
             return partree
 
         # Collect expressions inducing reductions
@@ -404,6 +389,10 @@ class Ompizer(object):
     def _make_parregion(self, partree, parrays):
         arrays = [i for i in FindSymbols().visit(partree) if i.is_Array]
 
+        # Detect thread-private arrays on the stack
+        stack_private = [i for i in arrays if i._mem_stack and i._mem_local]
+        stack_private = sorted(set([i.name for i in stack_private]))
+
         # Detect thread-private arrays on the heap and "map" them to shared
         # vector-expanded (one entry per thread) Arrays
         heap_private = [i for i in arrays if i._mem_heap and i._mem_local]
@@ -422,7 +411,7 @@ class Ompizer(object):
         else:
             body = partree
 
-        return OpenMPRegion(body, partree.nthreads)
+        return OpenMPRegion(body, partree.nthreads, stack_private)
 
     def _make_guard(self, partree, collapsed):
         # Do not enter the parallel region if the step increment is 0; this
@@ -458,7 +447,7 @@ class Ompizer(object):
             # within a block)
             candidates = []
             for i in inner:
-                if self.key(i) and any(is_integer(j.step-i.symbolic_size) for j in outer):
+                if any(is_integer(j.step - i.symbolic_size) for j in outer):
                     candidates.append(i)
                 elif candidates:
                     # If there's at least one candidate but `i` doesn't honor the
@@ -488,7 +477,7 @@ class Ompizer(object):
 
             # Outer parallelism
             root, partree, collapsed = self._make_partree(candidates)
-            if partree is None or root in mapper:
+            if root in mapper:
                 continue
 
             # Nested parallelism

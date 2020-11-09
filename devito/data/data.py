@@ -179,10 +179,9 @@ class Data(np.ndarray):
         return super(Data, self._local).__str__()
 
     @_check_idx
-    def __getitem__(self, glb_idx, comm_type, gather_rank=None):
+    def __getitem__(self, glb_idx, comm_type):
         loc_idx = self._index_glb_to_loc(glb_idx)
-        is_gather = True if isinstance(gather_rank, int) else False
-        if comm_type is index_by_index or is_gather:
+        if comm_type is index_by_index:
             # Retrieve the pertinent local data prior to mpi send/receive operations
             data_idx = loc_data_idx(loc_idx)
             self._index_stash = flip_idx(glb_idx, self._decomposition)
@@ -196,46 +195,33 @@ class Data(np.ndarray):
                 mpi_index_maps(loc_idx, local_val.shape, self._distributor.topology,
                                self._distributor.all_coords, comm)
 
+            retval = Data(local_val.shape, local_val.dtype.type,
+                          decomposition=local_val._decomposition,
+                          modulo=(False,)*len(local_val.shape))
             it = np.nditer(owners, flags=['refs_ok', 'multi_index'])
-            if not is_gather:
-                retval = Data(local_val.shape, local_val.dtype.type,
-                              decomposition=local_val._decomposition,
-                              modulo=(False,)*len(local_val.shape))
-            elif rank == gather_rank:
-                retval = np.zeros(it.shape)
-            else:
-                retval = np.empty((0, )*len(it.shape))
             # Iterate over each element of data
             while not it.finished:
                 index = it.multi_index
-                send_rank = gather_rank if is_gather else send[index]
-                if rank == owners[index] and rank == send_rank:
+                if rank == owners[index] and rank == send[index]:
                     # Current index and destination index are on the same rank
                     loc_ind = local_si[index]
-                    if is_gather:
-                        loc_ind = local_si[index]
-                        retval[global_si[index]] = local_val.data[loc_ind]
-                    else:
-                        send_ind = local_si[global_si[index]]
-                        retval.data[send_ind] = local_val.data[loc_ind]
+                    send_ind = local_si[global_si[index]]
+                    retval.data[send_ind] = local_val.data[loc_ind]
                 elif rank == owners[index]:
                     # Current index is on this rank and hence need to send
                     # the data to the appropriate rank
                     loc_ind = local_si[index]
-                    send_rank = gather_rank if is_gather else send[index]
+                    send_rank = send[index]
                     send_ind = global_si[index]
                     send_val = local_val.data[loc_ind]
                     reqs = comm.isend([send_ind, send_val], dest=send_rank)
                     reqs.wait()
-                elif rank == send_rank:
+                elif rank == send[index]:
                     # Current rank is required to receive data from this index
                     recval = comm.irecv(source=owners[index])
                     local_dat = recval.wait()
-                    if is_gather:
-                        retval[local_dat[0]] = local_dat[1]
-                    else:
-                        loc_ind = local_si[local_dat[0]]
-                        retval.data[loc_ind] = local_dat[1]
+                    loc_ind = local_si[local_dat[0]]
+                    retval.data[loc_ind] = local_dat[1]
                 else:
                     pass
                 it.iternext()
@@ -484,31 +470,6 @@ class Data(np.ndarray):
             else:
                 mapped_idx.append(None)
         return as_tuple(mapped_idx)
-
-    def _gather(self, start=None, stop=None, step=1, rank=0):
-        """
-        Method for gathering distributed data into a NumPy array
-        on a single rank. See the public ``data_gather`` method
-        of `Function`.
-        """
-        if not isinstance(rank, int):
-            raise TypeError('rank must be passed as an integer value.')
-
-        if isinstance(start, int) or start is None:
-            start = [start for _ in self.shape]
-        if isinstance(stop, int) or stop is None:
-            stop = [stop for _ in self.shape]
-        if isinstance(step, int) or step is None:
-            step = [step for _ in self.shape]
-        idx = []
-        for i, j, k in zip(start, stop, step):
-            idx.append(slice(i, j, k))
-        idx = tuple(idx)
-        if self._distributor.is_parallel and self._distributor.nprocs > 1:
-            gather_rank = rank
-        else:
-            gather_rank = None
-        return np.array(self.__getitem__(idx, gather_rank=gather_rank))
 
     def reset(self):
         """Set all Data entries to 0."""
